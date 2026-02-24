@@ -2,31 +2,11 @@ import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { Plus, Search, Edit2, Trash2, Package, RefreshCw } from 'lucide-react';
 import { BCH_TO_USD, formatUsd } from '../utils/currency';
+import { useDemoData } from '../context/DemoDataContext';
 
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  price: number;
-  priceBch: number;
-  stock: number;
-  category: string;
-  image: string;
-}
-
-const mockProducts: Product[] = [
-  { id: '1', name: 'Americano Coffee', sku: 'BEV-001', price: 1.68, priceBch: 0.0056, stock: 999, category: 'Beverage', image: 'AM' },
-  { id: '2', name: 'Special Fried Rice', sku: 'FOD-001', price: 2.34, priceBch: 0.0078, stock: 50, category: 'Food', image: 'FR' },
-  { id: '3', name: 'Butter Croissant', sku: 'FOD-002', price: 1.2, priceBch: 0.0040, stock: 25, category: 'Food', image: 'CR' },
-  { id: '4', name: 'Matcha Latte', sku: 'BEV-002', price: 2.13, priceBch: 0.0071, stock: 999, category: 'Beverage', image: 'ML' },
-  { id: '5', name: 'Classic Burger', sku: 'FOD-003', price: 2.79, priceBch: 0.0093, stock: 30, category: 'Food', image: 'BG' },
-  { id: '6', name: 'Fresh Orange Juice', sku: 'BEV-003', price: 1.32, priceBch: 0.0044, stock: 999, category: 'Beverage', image: 'OJ' },
-  { id: '7', name: 'Carbonara Pasta', sku: 'FOD-004', price: 3.21, priceBch: 0.0107, stock: 20, category: 'Food', image: 'PS' },
-  { id: '8', name: 'Cheesecake Slice', sku: 'FOD-005', price: 1.86, priceBch: 0.0062, stock: 15, category: 'Food', image: 'CK' },
-];
-
-export function Products() {
+export function Products({ onOpenCheckout }: { onOpenCheckout: () => void }) {
   const { isDark } = useTheme();
+  const { products, addToCart, cartCount } = useDemoData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const cardBg = 'neo-panel';
@@ -34,7 +14,7 @@ export function Products() {
   const textSub = isDark ? 'text-nexus-gray' : 'text-nexus-sub-light';
 
   const categories = ['All', 'Food', 'Beverage'];
-  const filtered = mockProducts.filter(p =>
+  const filtered = products.filter(p =>
     (selectedCategory === 'All' || p.category === selectedCategory) &&
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -75,8 +55,11 @@ export function Products() {
           `}>
             <RefreshCw className="h-3.5 w-3.5" /> Sync BCH Price
           </button>
-          <button className="flex items-center gap-2 rounded-xl bg-nexus-green px-4 py-2.5 text-xs font-semibold text-white transition-all hover:bg-nexus-green-dark cursor-pointer">
-            <Plus className="h-4 w-4" /> Add Product
+          <button
+            onClick={onOpenCheckout}
+            className="flex items-center gap-2 rounded-xl bg-nexus-green px-4 py-2.5 text-xs font-semibold text-white transition-all hover:bg-nexus-green-dark cursor-pointer"
+          >
+            <Plus className="h-4 w-4" /> Checkout ({cartCount})
           </button>
         </div>
       </div>
@@ -118,6 +101,12 @@ export function Products() {
                   <p className="text-xs font-semibold text-nexus-green">{product.priceBch} BCH</p>
                 </div>
                 <div className="flex gap-1">
+                  <button
+                    onClick={() => addToCart(product.id)}
+                    className="rounded-lg bg-nexus-green/15 px-2 py-2 text-[10px] font-semibold text-nexus-green transition-all hover:bg-nexus-green/25 cursor-pointer"
+                  >
+                    Add
+                  </button>
                   <button className={`rounded-lg p-2 transition-all cursor-pointer ${isDark ? 'text-nexus-gray hover:bg-white/5' : 'text-nexus-sub-light hover:bg-gray-100'}`}>
                     <Edit2 className="h-3.5 w-3.5" />
                   </button>

@@ -4,6 +4,7 @@ import { Sun, Moon, Bell, Search, Wallet } from 'lucide-react';
 const pageTitles: Record<string, string> = {
   dashboard: 'Dashboard',
   products: 'Product Catalog',
+  checkout: 'Live Checkout Demo',
   transactions: 'Transactions',
   treasury: 'CashToken Treasury',
   customers: 'Customers',
@@ -27,6 +28,10 @@ export function Header({ activePage }: { activePage: string }) {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <span className="hidden rounded-full bg-nexus-green/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-nexus-green md:inline-block">
+          Demo Mode
+        </span>
+
         {/* Search */}
         <div className={`neo-input hidden items-center gap-2 px-3 py-2 text-sm md:flex ${isDark ? 'text-nexus-gray' : 'text-nexus-sub-light'}`}>
           <Search className="h-4 w-4" />

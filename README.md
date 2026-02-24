@@ -8,7 +8,7 @@ N-Cash POS adalah sistem Point of Sale berbasis **Bitcoin Cash (BCH) + CashToken
 - integrasi lokasi outlet.
 
 Repository ini sekarang memakai struktur **dua lapis**:
-- **Web prototype (Vite + React)** untuk referensi visual Fase 1.
+- **Web app (Vite + React)** sebagai demo utama sprint DoraHacks (web-first).
 - **Android app (Kotlin + Compose)** sebagai implementasi utama hackathon.
 
 ## Progress Tracker
@@ -17,6 +17,25 @@ Repository ini sekarang memakai struktur **dua lapis**:
 - [ ] Fase 3: Integrasi Firebase & Google Maps
 - [ ] Fase 4: Integrasi Web3 & CashTokens Engine
 - [ ] Fase 5: QA, Finalisasi, & Dokumentasi Submission
+
+## Sprint Strategy (Submission Window)
+- Primary demo: **Web-first** untuk memaksimalkan execution dan clarity pada penjurian.
+- Native Android: tetap dipertahankan sebagai roadmap implementasi lanjutan.
+- Scope board aktif: [Sprint Execution Board](docs/SPRINT_EXECUTION_BOARD.md)
+
+## Web Demo Flow (Current)
+- Live Checkout
+- Dynamic transaction state (`pending`, `confirmed`, `failed`)
+- Mint simulation saat `confirmed`:
+  - CashToken loyalty points
+  - NFT Receipt ID
+- Transactions dan Dashboard sinkron dengan transaksi baru dari checkout flow
+
+## Menjalankan Web Demo
+1. Install dependency: `npm install`
+2. Jalankan dev server: `npm run dev`
+3. Build production: `npm run build`
+4. Alur demo utama ada di menu `Live Checkout`
 
 ## Struktur Repository
 ```text
@@ -47,6 +66,7 @@ NEXUS CASH/
 |-- src/                              # Web prototype phase-1
 |-- docs/
 |   |-- ARCHITECTURE.md
+|   |-- SPRINT_EXECUTION_BOARD.md
 |   `-- ROADMAP_DORAHACKS.md
 `-- README.md
 ```

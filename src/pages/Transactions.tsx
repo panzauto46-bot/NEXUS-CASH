@@ -2,20 +2,11 @@ import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { Search, Filter, Download, ExternalLink, QrCode, Copy, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { formatUsd } from '../utils/currency';
-
-const transactions = [
-  { id: 'TX-0042', customer: 'bitcoincash:qz3f...8a2c', items: ['Americano Coffee x2', 'Butter Croissant x1'], bch: 0.0152, fiat: 4.56, status: 'confirmed', time: '14:32', date: '2024-01-15', nftMinted: true, tokensGiven: 46, blockHeight: 831204 },
-  { id: 'TX-0041', customer: 'bitcoincash:qp7b...1d4e', items: ['Matcha Latte x1'], bch: 0.0071, fiat: 2.13, status: 'confirmed', time: '14:24', date: '2024-01-15', nftMinted: true, tokensGiven: 21, blockHeight: 831203 },
-  { id: 'TX-0040', customer: 'bitcoincash:qa1x...9f3b', items: ['Classic Burger x1', 'Fresh Orange Juice x2', 'Carbonara Pasta x1', 'Cheesecake Slice x1'], bch: 0.0328, fiat: 9.84, status: 'pending', time: '14:18', date: '2024-01-15', nftMinted: false, tokensGiven: 0, blockHeight: null },
-  { id: 'TX-0039', customer: 'bitcoincash:qc8m...2e7a', items: ['Special Fried Rice x1', 'Americano Coffee x1'], bch: 0.0134, fiat: 4.02, status: 'confirmed', time: '13:55', date: '2024-01-15', nftMinted: true, tokensGiven: 40, blockHeight: 831201 },
-  { id: 'TX-0038', customer: 'bitcoincash:q5dr...4c1f', items: ['Carbonara Pasta x2'], bch: 0.0214, fiat: 6.42, status: 'failed', time: '13:42', date: '2024-01-15', nftMinted: false, tokensGiven: 0, blockHeight: null },
-  { id: 'TX-0037', customer: 'bitcoincash:qe9k...7b5d', items: ['Cheesecake Slice x3'], bch: 0.0186, fiat: 5.58, status: 'confirmed', time: '13:15', date: '2024-01-15', nftMinted: true, tokensGiven: 56, blockHeight: 831198 },
-  { id: 'TX-0036', customer: 'bitcoincash:qf2n...3a8e', items: ['Americano Coffee x1', 'Matcha Latte x1'], bch: 0.0127, fiat: 3.81, status: 'confirmed', time: '12:48', date: '2024-01-15', nftMinted: true, tokensGiven: 38, blockHeight: 831195 },
-  { id: 'TX-0035', customer: 'bitcoincash:qg6p...9d2c', items: ['Classic Burger x2', 'Fresh Orange Juice x2'], bch: 0.0274, fiat: 8.22, status: 'confirmed', time: '12:20', date: '2024-01-15', nftMinted: true, tokensGiven: 82, blockHeight: 831192 },
-];
+import { useDemoData } from '../context/DemoDataContext';
 
 export function Transactions() {
   const { isDark } = useTheme();
+  const { transactions } = useDemoData();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedTx, setSelectedTx] = useState<string | null>(null);
@@ -29,6 +20,10 @@ export function Transactions() {
     (tx.id.toLowerCase().includes(searchTerm.toLowerCase()) || tx.customer.toLowerCase().includes(searchTerm.toLowerCase()))
   );
   const totalTodayFiat = transactions.reduce((sum, tx) => sum + tx.fiat, 0);
+  const totalTodayBch = transactions.reduce((sum, tx) => sum + tx.bch, 0);
+  const successfulCount = transactions.filter(tx => tx.status === 'confirmed').length;
+  const mintedCount = transactions.filter(tx => tx.nftMinted).length;
+  const totalTokens = transactions.reduce((sum, tx) => sum + tx.tokensGiven, 0);
 
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === 'confirmed') return <CheckCircle2 className="h-4 w-4 text-nexus-green" />;
@@ -40,10 +35,10 @@ export function Transactions() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: 'Total Today', value: '0.1486 BCH', sub: formatUsd(totalTodayFiat) },
-          { label: 'Successful Transactions', value: '6', sub: '75% success rate' },
-          { label: 'Receipt NFTs Minted', value: '6', sub: 'Today' },
-          { label: 'Tokens Distributed', value: '283', sub: '$NEXUS Points' },
+          { label: 'Total Today', value: `${totalTodayBch.toFixed(4)} BCH`, sub: formatUsd(totalTodayFiat) },
+          { label: 'Successful Transactions', value: String(successfulCount), sub: `${transactions.length === 0 ? 0 : Math.round((successfulCount / transactions.length) * 100)}% success rate` },
+          { label: 'Receipt NFTs Minted', value: String(mintedCount), sub: 'Minted receipts' },
+          { label: 'Tokens Distributed', value: String(totalTokens), sub: '$NEXUS Points' },
         ].map((s, i) => (
           <div key={i} className={`rounded-2xl p-4 ${cardBg}`}>
             <p className={`text-xs font-medium ${textSub}`}>{s.label}</p>
@@ -145,6 +140,7 @@ export function Transactions() {
                     <div className="space-y-1 text-xs">
                       <p className={textSub}>Receipt NFT: <span className={tx.nftMinted ? 'text-nexus-green' : 'text-nexus-red'}>{tx.nftMinted ? 'Minted' : 'No'}</span></p>
                       <p className={textSub}>$NEXUS: <span className="text-nexus-cyan">+{tx.tokensGiven} pts</span></p>
+                      {tx.receiptNftId && <p className={textSub}>Receipt ID: <span className={textMain}>{tx.receiptNftId}</span></p>}
                     </div>
                   </div>
                 </div>

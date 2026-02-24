@@ -4,6 +4,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
 import { TrendingUp, TrendingDown, ArrowUpRight, Coins, Receipt, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { useDemoData } from '../context/DemoDataContext';
 
 const revenueData = [
   { day: 'Mon', bch: 0.42, fiat: 126 },
@@ -27,14 +28,6 @@ const tokenDistribution = [
   { name: 'Distributed', value: 45000, color: '#0AC18E' },
   { name: 'Available', value: 35000, color: '#00E5FF' },
   { name: 'Burned', value: 20000, color: '#FF4C4C' },
-];
-
-const recentTransactions = [
-  { id: 'TX-0042', customer: '0x3f...8a2c', items: 3, bch: 0.0245, status: 'confirmed', time: '2 min ago' },
-  { id: 'TX-0041', customer: '0x7b...1d4e', items: 1, bch: 0.0089, status: 'confirmed', time: '8 min ago' },
-  { id: 'TX-0040', customer: '0xa1...9f3b', items: 5, bch: 0.0512, status: 'pending', time: '12 min ago' },
-  { id: 'TX-0039', customer: '0xc8...2e7a', items: 2, bch: 0.0178, status: 'confirmed', time: '25 min ago' },
-  { id: 'TX-0038', customer: '0x5d...4c1f', items: 4, bch: 0.0367, status: 'failed', time: '32 min ago' },
 ];
 
 function StatCard({ icon: Icon, label, value, change, positive, isDark, delay }: {
@@ -74,17 +67,19 @@ function StatCard({ icon: Icon, label, value, change, positive, isDark, delay }:
 
 export function Dashboard() {
   const { isDark } = useTheme();
+  const { transactions, dashboardMetrics } = useDemoData();
   const textMain = isDark ? 'text-white' : 'text-nexus-text-light';
   const textSub = isDark ? 'text-nexus-gray' : 'text-nexus-sub-light';
   const chartGrid = isDark ? '#2a3f42' : '#9fc3ba';
+  const recentTransactions = transactions.slice(0, 5);
 
   return (
     <div className="space-y-5">
       <div className="neo-page-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Wallet} label="Total BCH This Week" value="6.47 BCH" change="+23.5%" positive={true} isDark={isDark} delay={0} />
-        <StatCard icon={Receipt} label="Total Transactions" value="156" change="+12.3%" positive={true} isDark={isDark} delay={80} />
-        <StatCard icon={Coins} label="CashTokens Minted" value="4,680" change="+8.7%" positive={true} isDark={isDark} delay={140} />
-        <StatCard icon={Users} label="Active Customers" value="89" change="-2.1%" positive={false} isDark={isDark} delay={200} />
+        <StatCard icon={Wallet} label="Total BCH Volume" value={`${dashboardMetrics.totalBch.toFixed(4)} BCH`} change="+23.5%" positive={true} isDark={isDark} delay={0} />
+        <StatCard icon={Receipt} label="Total Transactions" value={dashboardMetrics.totalTransactions.toString()} change="+12.3%" positive={true} isDark={isDark} delay={80} />
+        <StatCard icon={Coins} label="CashTokens Minted" value={dashboardMetrics.mintedTokens.toLocaleString()} change="+8.7%" positive={true} isDark={isDark} delay={140} />
+        <StatCard icon={Users} label="Active Customers" value={dashboardMetrics.activeCustomers.toString()} change="-2.1%" positive={false} isDark={isDark} delay={200} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -214,7 +209,7 @@ export function Dashboard() {
                   <tr key={tx.id} className={`neo-table-row border-b ${isDark ? 'border-white/5' : 'border-nexus-border-light'} last:border-0`}>
                     <td className={`py-3 font-mono font-semibold ${textMain}`}>{tx.id}</td>
                     <td className="py-3 font-mono text-nexus-cyan">{tx.customer}</td>
-                    <td className={`py-3 ${textSub}`}>{tx.items} items</td>
+                    <td className={`py-3 ${textSub}`}>{tx.items.length} items</td>
                     <td className={`py-3 font-semibold ${textMain}`}>{tx.bch} BCH</td>
                     <td className="py-3">
                       <span className={`rounded-md px-2 py-1 text-[10px] font-bold uppercase

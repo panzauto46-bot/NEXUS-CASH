@@ -1,12 +1,13 @@
 import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, Package, Receipt, Coins, Users, UserCog,
-  Settings, ChevronLeft, ChevronRight, Zap
+  Settings, ChevronLeft, ChevronRight, Zap, QrCode
 } from 'lucide-react';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'products', label: 'Product Catalog', icon: Package },
+  { id: 'checkout', label: 'Live Checkout', icon: QrCode },
   { id: 'transactions', label: 'Transactions', icon: Receipt },
   { id: 'treasury', label: 'CashToken Treasury', icon: Coins },
   { id: 'customers', label: 'Customers', icon: Users },

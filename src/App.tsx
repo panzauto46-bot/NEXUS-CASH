@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { DemoDataProvider } from './context/DemoDataContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './pages/Dashboard';
 import { Products } from './pages/Products';
 import { Transactions } from './pages/Transactions';
+import { Checkout } from './pages/Checkout';
 import { Treasury } from './pages/Treasury';
 import { Customers } from './pages/Customers';
 import { Employees } from './pages/Employees';
@@ -28,8 +30,9 @@ function AppContent() {
   const renderPage = () => {
     switch (activePage) {
       case 'dashboard': return <Dashboard />;
-      case 'products': return <Products />;
+      case 'products': return <Products onOpenCheckout={() => setActivePage('checkout')} />;
       case 'transactions': return <Transactions />;
+      case 'checkout': return <Checkout onOpenProducts={() => setActivePage('products')} />;
       case 'treasury': return <Treasury />;
       case 'customers': return <Customers />;
       case 'employees': return <Employees />;
@@ -63,7 +66,9 @@ function AppContent() {
 export function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <DemoDataProvider>
+        <AppContent />
+      </DemoDataProvider>
     </ThemeProvider>
   );
 }
