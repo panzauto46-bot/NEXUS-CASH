@@ -9,18 +9,18 @@ Membangun POS mobile untuk merchant yang mampu:
 - menyediakan dashboard operasional untuk owner.
 
 ## Status Per Fase
-## Fase 1 - UI/UX Design and Flow Mapping (DONE)
+### Fase 1 - UI/UX Design and Flow Mapping (DONE)
 - Wireframe dashboard kasir + owner.
 - Definisi page flow: Dashboard, Produk, Transaksi, Treasury, Customers, Employees, Settings.
 - Validasi konsep visual.
 
-## Fase 2 - Android Init and Core Infrastructure (DONE)
+### Fase 2 - Android Init and Core Infrastructure (DONE)
 - Proyek Android Studio (Kotlin + Compose) dibuat.
 - Dependency dasar terpasang: Firebase BoM, Maps SDK, web3 foundation.
 - Arsitektur MVVM dibangun.
 - Semua screen utama hasil Fase 1 dipindahkan ke Compose.
 
-## Fase 3 - Firebase and Google Maps Integration (NEXT)
+### Fase 3 - Firebase and Google Maps Integration (NEXT)
 Deliverables:
 - Firebase Auth (role owner/cashier).
 - Firestore collections:
@@ -39,7 +39,7 @@ Definition of Done:
 - CRUD produk dan transaksi tersimpan di Firestore.
 - Peta menampilkan lokasi outlet dari backend.
 
-## Fase 4 - Web3 and CashTokens Engine (NEXT)
+### Fase 4 - Web3 and CashTokens Engine (NEXT)
 Deliverables:
 - BCH payment request flow (address + amount).
 - Listener/verification transaksi on-chain.
@@ -54,7 +54,7 @@ Definition of Done:
   - status confirmed,
   - loyalty token terdistribusi.
 
-## Fase 5 - QA and Submission Packaging (NEXT)
+### Fase 5 - QA and Submission Packaging (NEXT)
 Deliverables:
 - Unit test untuk ViewModel kritikal.
 - Uji UAT kasir/owner scenario.

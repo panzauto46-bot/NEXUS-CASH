@@ -7,7 +7,7 @@
 - **Single-activity Compose app** dengan Navigation Compose.
 
 ## Layering
-## 1. Model Layer (`core/model`)
+### 1. Model Layer (`core/model`)
 Berisi data class domain:
 - `Product`
 - `SaleTransaction`
@@ -16,7 +16,7 @@ Berisi data class domain:
 - `Customer`
 - `Employee`
 
-## 2. Data Layer (`core/repository`)
+### 2. Data Layer (`core/repository`)
 - `NCashRepository`: kontrak data app.
 - `MockNCashRepository`: provider mock data fase awal.
 
@@ -25,7 +25,7 @@ Pada Fase 3 dan Fase 4, layer ini akan dipecah menjadi:
 - `BchChainRepository`
 - `CashTokenRepository`
 
-## 3. Presentation Layer (`ui/feature/*`)
+### 3. Presentation Layer (`ui/feature/*`)
 Setiap fitur memiliki:
 - `ViewModel`
 - `UiState`
@@ -35,7 +35,7 @@ Contoh:
 - `ui/feature/products/ProductsViewModel.kt`
 - `ui/feature/products/ProductsScreen.kt`
 
-## 4. Navigation Layer (`ui/navigation`)
+### 4. Navigation Layer (`ui/navigation`)
 - `NCashScreen` sebagai source of truth route + title + icon.
 - `NCashPosApp` sebagai shell utama:
   - drawer navigation
@@ -43,25 +43,25 @@ Contoh:
   - host semua composable route
 
 ## Dependency Matrix
-## UI
+### UI
 - `androidx.compose.material3:material3`
 - `androidx.navigation:navigation-compose`
 - `androidx.lifecycle:lifecycle-viewmodel-compose`
 
-## Data and Concurrency
+### Data and Concurrency
 - `kotlinx-coroutines-android`
 
-## Firebase (Fase 3)
+### Firebase (Fase 3)
 - `firebase-bom`
 - `firebase-auth-ktx`
 - `firebase-firestore-ktx`
 - `firebase-analytics-ktx`
 
-## Maps (Fase 3)
+### Maps (Fase 3)
 - `play-services-maps`
 - `maps-compose`
 
-## Web3/BCH Foundation (Fase 4)
+### Web3/BCH Foundation (Fase 4)
 - `bitcoinj-core`
 - `bcprov-jdk18on`
 
@@ -72,12 +72,12 @@ Contoh:
 - Currency formatting terpusat pada util (`CurrencyFormat`).
 
 ## Strategy Upgrade Berikutnya
-## Fase 3 Refactor Plan
+### Fase 3 Refactor Plan
 - Tambah `data/remote/firebase/*` untuk mapping Firestore DTO.
 - Tambah `data/mapper/*` untuk konversi DTO -> domain model.
 - Inject repository lewat DI (Hilt/Koin) agar testable.
 
-## Fase 4 Refactor Plan
+### Fase 4 Refactor Plan
 - Pisahkan on-chain adapter:
   - `PaymentAddressGenerator`
   - `TransactionVerifier`

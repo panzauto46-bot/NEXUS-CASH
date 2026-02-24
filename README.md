@@ -86,12 +86,12 @@ Screen utama yang sudah tersedia:
 Semua screen sudah terhubung di satu shell navigasi (`NCashPosApp.kt`) agar siap diisi logic backend dan on-chain di fase berikutnya.
 
 ## Cara Menjalankan Android App
-## 1. Prasyarat
+### 1. Prasyarat
 - Android Studio Hedgehog atau terbaru
 - JDK 17
 - Android SDK (API 35)
 
-## 2. Setup Lokal
+### 2. Setup Lokal
 1. Buka folder `android-app` di Android Studio.
 2. Copy `android-app/local.properties.example` menjadi `android-app/local.properties`.
 3. Isi `sdk.dir` dan `MAPS_API_KEY`.
@@ -99,7 +99,7 @@ Semua screen sudah terhubung di satu shell navigasi (`NCashPosApp.kt`) agar siap
    - simpan sebagai `android-app/app/google-services.json`
 5. Sync Gradle project.
 
-## 3. Run
+### 3. Run
 - Jalankan konfigurasi `app` di emulator/device Android.
 
 ## Dokumen Pendukung
