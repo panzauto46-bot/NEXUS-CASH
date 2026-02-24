@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BCH_TO_USD } from '../utils/currency';
 
 export type TransactionStatus = 'confirmed' | 'pending' | 'failed';
@@ -42,10 +42,16 @@ export interface CheckoutSession {
   amountBch: number;
   paymentAddress: string;
   paymentUri: string;
-  status: 'awaiting_payment' | 'confirmed' | 'failed';
+  status: 'awaiting_payment' | 'broadcasting' | 'confirming' | 'confirmed' | 'failed' | 'expired';
   tokenReward: number;
   receiptNftId: string;
   orderLines: Array<{ productId: string; quantity: number }>;
+  createdAt: number;
+  expiresAt: number;
+  paidAt?: number;
+  confirmedAt?: number;
+  networkRef?: string;
+  failureReason?: string;
 }
 
 interface DashboardMetrics {
@@ -76,8 +82,7 @@ interface DemoDataContextValue {
   clearCart: () => void;
   setCustomerWallet: (wallet: string) => void;
   startCheckout: () => void;
-  simulateConfirmPayment: () => void;
-  simulateFailedPayment: () => void;
+  submitDemoPayment: () => void;
   clearCheckoutSession: () => void;
 }
 
@@ -94,6 +99,10 @@ const demoProducts: DemoProduct[] = [
 
 const merchantAddress = 'bitcoincash:qph7w9merchant8qv8xdem0m28jk4alhjk2jv7r3';
 const UNLIMITED_STOCK = 999;
+const CHECKOUT_EXPIRY_MS = 5 * 60 * 1000;
+const BROADCAST_DELAY_MS = 1200;
+const CONFIRMATION_BASE_DELAY_MS = 3200;
+const CONFIRMATION_RANDOM_DELAY_MS = 2200;
 
 const DemoDataContext = createContext<DemoDataContextValue | undefined>(undefined);
 
@@ -208,6 +217,11 @@ function getNextTransactionId(transactions: DemoTransaction[]): string {
   return `TX-${String(highest + 1).padStart(4, '0')}`;
 }
 
+function randomNetworkRef(txId: string): string {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `mempool-${txId.toLowerCase()}-${suffix}`;
+}
+
 export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [bchUsdRate, setBchUsdRate] = useState<number>(BCH_TO_USD);
   const [lastRateSyncAt, setLastRateSyncAt] = useState<Date | null>(new Date());
@@ -216,6 +230,8 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerWallet, setCustomerWallet] = useState('bitcoincash:qrx9...newbuyer');
   const [activeCheckout, setActiveCheckout] = useState<CheckoutSession | null>(null);
+  const broadcastingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirmationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cartLines = useMemo(() => {
     return cart
@@ -336,8 +352,93 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => setCart([]);
 
+  const clearPaymentTimers = () => {
+    if (broadcastingTimerRef.current) {
+      clearTimeout(broadcastingTimerRef.current);
+      broadcastingTimerRef.current = null;
+    }
+    if (confirmationTimerRef.current) {
+      clearTimeout(confirmationTimerRef.current);
+      confirmationTimerRef.current = null;
+    }
+  };
+
+  const settleCheckoutAsConfirmed = (session: CheckoutSession) => {
+    const randomHeight = 831200 + Math.floor(Math.random() * 500);
+    let transitionedToConfirmed = false;
+
+    setTransactions(prev => prev.map(tx => {
+      if (tx.id !== session.txId) return tx;
+      if (tx.status === 'confirmed') return tx;
+      transitionedToConfirmed = true;
+      return {
+        ...tx,
+        status: 'confirmed',
+        nftMinted: true,
+        tokensGiven: session.tokenReward,
+        blockHeight: randomHeight,
+        receiptNftId: session.receiptNftId,
+      };
+    }));
+
+    if (transitionedToConfirmed && session.orderLines.length > 0) {
+      setProducts(prevProducts => prevProducts.map(product => {
+        const orderedLine = session.orderLines.find(line => line.productId === product.id);
+        if (!orderedLine) return product;
+        if (product.stock === UNLIMITED_STOCK) return product;
+        const nextStock = Math.max(0, product.stock - orderedLine.quantity);
+        return { ...product, stock: nextStock };
+      }));
+    }
+
+    setActiveCheckout(prev => {
+      if (!prev || prev.txId !== session.txId) return prev;
+      if (prev.status === 'confirmed') return prev;
+      return {
+        ...prev,
+        status: 'confirmed',
+        confirmedAt: Date.now(),
+        failureReason: undefined,
+      };
+    });
+
+    clearPaymentTimers();
+  };
+
+  const settleCheckoutAsFailed = (
+    session: CheckoutSession,
+    nextStatus: 'failed' | 'expired',
+    reason: string,
+  ) => {
+    setTransactions(prev => prev.map(tx => {
+      if (tx.id !== session.txId) return tx;
+      if (tx.status === 'confirmed') return tx;
+      return {
+        ...tx,
+        status: 'failed',
+        nftMinted: false,
+        tokensGiven: 0,
+        blockHeight: null,
+      };
+    }));
+
+    setActiveCheckout(prev => {
+      if (!prev || prev.txId !== session.txId) return prev;
+      if (prev.status === 'confirmed') return prev;
+      return {
+        ...prev,
+        status: nextStatus,
+        failureReason: reason,
+      };
+    });
+
+    clearPaymentTimers();
+  };
+
   const startCheckout = () => {
     if (cartLines.length === 0) return;
+
+    clearPaymentTimers();
 
     const txId = getNextTransactionId(transactions);
     const { date, time } = getNowParts();
@@ -372,57 +473,93 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       tokenReward,
       receiptNftId,
       orderLines: cart.map(line => ({ productId: line.productId, quantity: line.quantity })),
+      createdAt: Date.now(),
+      expiresAt: Date.now() + CHECKOUT_EXPIRY_MS,
     });
     setCart([]);
   };
 
-  const simulateConfirmPayment = () => {
+  const submitDemoPayment = () => {
     if (!activeCheckout) return;
-    const randomHeight = 831200 + Math.floor(Math.random() * 500);
+    if (activeCheckout.status !== 'awaiting_payment') return;
 
-    setTransactions(prev => prev.map(tx => {
-      if (tx.id !== activeCheckout.txId) return tx;
-      return {
-        ...tx,
-        status: 'confirmed',
-        nftMinted: true,
-        tokensGiven: activeCheckout.tokenReward,
-        blockHeight: randomHeight,
-        receiptNftId: activeCheckout.receiptNftId,
-      };
-    }));
-
-    if (activeCheckout.orderLines.length > 0) {
-      setProducts(prevProducts => prevProducts.map(product => {
-        const orderedLine = activeCheckout.orderLines.find(line => line.productId === product.id);
-        if (!orderedLine) return product;
-        if (product.stock === UNLIMITED_STOCK) return product;
-        const nextStock = Math.max(0, product.stock - orderedLine.quantity);
-        return { ...product, stock: nextStock };
-      }));
+    if (Date.now() >= activeCheckout.expiresAt) {
+      settleCheckoutAsFailed(activeCheckout, 'expired', 'Payment request expired. Generate a new QR.');
+      return;
     }
 
-    setActiveCheckout(prev => prev ? { ...prev, status: 'confirmed' } : null);
-  };
+    clearPaymentTimers();
 
-  const simulateFailedPayment = () => {
-    if (!activeCheckout) return;
+    const checkoutSnapshot = activeCheckout;
+    const networkRef = randomNetworkRef(checkoutSnapshot.txId);
+    const now = Date.now();
 
-    setTransactions(prev => prev.map(tx => {
-      if (tx.id !== activeCheckout.txId) return tx;
+    setActiveCheckout(prev => {
+      if (!prev || prev.txId !== checkoutSnapshot.txId) return prev;
+      if (prev.status !== 'awaiting_payment') return prev;
       return {
-        ...tx,
-        status: 'failed',
-        nftMinted: false,
-        tokensGiven: 0,
-        blockHeight: null,
+        ...prev,
+        status: 'broadcasting',
+        paidAt: now,
+        networkRef,
+        failureReason: undefined,
       };
-    }));
+    });
 
-    setActiveCheckout(prev => prev ? { ...prev, status: 'failed' } : null);
+    const confirmationDelay =
+      CONFIRMATION_BASE_DELAY_MS +
+      Math.floor(Math.random() * CONFIRMATION_RANDOM_DELAY_MS);
+
+    broadcastingTimerRef.current = setTimeout(() => {
+      setActiveCheckout(prev => {
+        if (!prev || prev.txId !== checkoutSnapshot.txId) return prev;
+        if (prev.status !== 'broadcasting') return prev;
+        return { ...prev, status: 'confirming' };
+      });
+    }, BROADCAST_DELAY_MS);
+
+    confirmationTimerRef.current = setTimeout(() => {
+      const expired = Date.now() >= checkoutSnapshot.expiresAt;
+      if (expired) {
+        settleCheckoutAsFailed(checkoutSnapshot, 'expired', 'Payment window expired before block confirmation.');
+        return;
+      }
+
+      const shouldConfirm = Math.random() < 0.9;
+      if (shouldConfirm) {
+        settleCheckoutAsConfirmed(checkoutSnapshot);
+        return;
+      }
+
+      settleCheckoutAsFailed(checkoutSnapshot, 'failed', 'Network timeout while waiting for confirmation.');
+    }, BROADCAST_DELAY_MS + confirmationDelay);
   };
 
-  const clearCheckoutSession = () => setActiveCheckout(null);
+  const clearCheckoutSession = () => {
+    clearPaymentTimers();
+    setActiveCheckout(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearPaymentTimers();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeCheckout || activeCheckout.status !== 'awaiting_payment') return;
+    const remainingMs = activeCheckout.expiresAt - Date.now();
+    if (remainingMs <= 0) {
+      settleCheckoutAsFailed(activeCheckout, 'expired', 'Payment request expired. Generate a new QR.');
+      return;
+    }
+
+    const expiryTimer = setTimeout(() => {
+      settleCheckoutAsFailed(activeCheckout, 'expired', 'Payment request expired. Generate a new QR.');
+    }, remainingMs + 50);
+
+    return () => clearTimeout(expiryTimer);
+  }, [activeCheckout]);
 
   return (
     <DemoDataContext.Provider
@@ -447,8 +584,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         clearCart,
         setCustomerWallet,
         startCheckout,
-        simulateConfirmPayment,
-        simulateFailedPayment,
+        submitDemoPayment,
         clearCheckoutSession,
       }}
     >
