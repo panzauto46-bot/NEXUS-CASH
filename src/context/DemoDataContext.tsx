@@ -45,6 +45,7 @@ export interface CheckoutSession {
   status: 'awaiting_payment' | 'confirmed' | 'failed';
   tokenReward: number;
   receiptNftId: string;
+  orderLines: Array<{ productId: string; quantity: number }>;
 }
 
 interface DashboardMetrics {
@@ -56,6 +57,8 @@ interface DashboardMetrics {
 
 interface DemoDataContextValue {
   products: DemoProduct[];
+  bchUsdRate: number;
+  lastRateSyncAt: Date | null;
   transactions: DemoTransaction[];
   cartLines: Array<{ product: DemoProduct; quantity: number; lineTotalUsd: number; lineTotalBch: number }>;
   cartCount: number;
@@ -64,6 +67,10 @@ interface DemoDataContextValue {
   customerWallet: string;
   activeCheckout: CheckoutSession | null;
   dashboardMetrics: DashboardMetrics;
+  createProduct: (input: Omit<DemoProduct, 'id' | 'priceBch'>) => void;
+  updateProduct: (productId: string, patch: Partial<Omit<DemoProduct, 'id'>>) => void;
+  deleteProduct: (productId: string) => void;
+  syncBchRate: () => void;
   addToCart: (productId: string) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -86,12 +93,51 @@ const demoProducts: DemoProduct[] = [
 ];
 
 const merchantAddress = 'bitcoincash:qph7w9merchant8qv8xdem0m28jk4alhjk2jv7r3';
+const UNLIMITED_STOCK = 999;
 
 const DemoDataContext = createContext<DemoDataContextValue | undefined>(undefined);
 
 function roundTo(value: number, digits: number): number {
   const base = Math.pow(10, digits);
   return Math.round(value * base) / base;
+}
+
+function toBch(usdValue: number, rate: number): number {
+  if (rate <= 0) return 0;
+  return roundTo(usdValue / rate, 4);
+}
+
+function withRate(products: DemoProduct[], rate: number): DemoProduct[] {
+  return products.map(product => ({
+    ...product,
+    priceBch: toBch(product.price, rate),
+  }));
+}
+
+function normalizeProductInput(input: Omit<DemoProduct, 'id' | 'priceBch'>): Omit<DemoProduct, 'id' | 'priceBch'> {
+  const cleanName = input.name.trim();
+  const cleanSku = input.sku.trim().toUpperCase();
+  const cleanImage = input.image.trim().toUpperCase().slice(0, 2) || cleanName.slice(0, 2).toUpperCase();
+  const cleanPrice = roundTo(Math.max(input.price, 0), 2);
+  const cleanStock = input.stock === UNLIMITED_STOCK ? UNLIMITED_STOCK : Math.max(0, Math.round(input.stock));
+  const cleanCategory = input.category === 'Food' ? 'Food' : 'Beverage';
+
+  return {
+    name: cleanName,
+    sku: cleanSku,
+    image: cleanImage,
+    price: cleanPrice,
+    stock: cleanStock,
+    category: cleanCategory,
+  };
+}
+
+function getNextProductId(products: DemoProduct[]): string {
+  const highest = products.reduce((max, product) => {
+    const value = Number(product.id);
+    return Number.isFinite(value) ? Math.max(max, value) : max;
+  }, 0);
+  return String(highest + 1);
 }
 
 function formatLocalDate(value: Date): string {
@@ -163,7 +209,9 @@ function getNextTransactionId(transactions: DemoTransaction[]): string {
 }
 
 export function DemoDataProvider({ children }: { children: ReactNode }) {
-  const [products] = useState<DemoProduct[]>(demoProducts);
+  const [bchUsdRate, setBchUsdRate] = useState<number>(BCH_TO_USD);
+  const [lastRateSyncAt, setLastRateSyncAt] = useState<Date | null>(new Date());
+  const [products, setProducts] = useState<DemoProduct[]>(() => withRate(demoProducts, BCH_TO_USD));
   const [transactions, setTransactions] = useState<DemoTransaction[]>(() => createSeedTransactions());
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerWallet, setCustomerWallet] = useState('bitcoincash:qrx9...newbuyer');
@@ -186,7 +234,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const cartCount = cartLines.reduce((sum, line) => sum + line.quantity, 0);
   const cartTotalUsd = roundTo(cartLines.reduce((sum, line) => sum + line.lineTotalUsd, 0), 2);
-  const cartTotalBch = roundTo(cartTotalUsd / BCH_TO_USD, 4);
+  const cartTotalBch = toBch(cartTotalUsd, bchUsdRate);
 
   const dashboardMetrics = useMemo<DashboardMetrics>(() => {
     const totalBch = roundTo(transactions.reduce((sum, tx) => sum + tx.bch, 0), 4);
@@ -196,20 +244,93 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     return { totalBch, totalTransactions, mintedTokens, activeCustomers };
   }, [transactions]);
 
+  const createProduct = (input: Omit<DemoProduct, 'id' | 'priceBch'>) => {
+    const normalized = normalizeProductInput(input);
+    if (!normalized.name || normalized.price <= 0) return;
+
+    setProducts(prev => {
+      const nextProduct: DemoProduct = {
+        ...normalized,
+        id: getNextProductId(prev),
+        priceBch: toBch(normalized.price, bchUsdRate),
+      };
+      return [nextProduct, ...prev];
+    });
+  };
+
+  const updateProduct = (productId: string, patch: Partial<Omit<DemoProduct, 'id'>>) => {
+    setProducts(prev => {
+      const nextProducts = prev.map(product => {
+        if (product.id !== productId) return product;
+        const merged = normalizeProductInput({
+          name: patch.name ?? product.name,
+          sku: patch.sku ?? product.sku,
+          image: patch.image ?? product.image,
+          price: patch.price ?? product.price,
+          stock: patch.stock ?? product.stock,
+          category: patch.category ?? product.category,
+        });
+        return {
+          ...product,
+          ...merged,
+          priceBch: toBch(merged.price, bchUsdRate),
+        };
+      });
+
+      setCart(prevCart => prevCart.flatMap(line => {
+        const product = nextProducts.find(item => item.id === line.productId);
+        if (!product) return [];
+        if (product.stock === UNLIMITED_STOCK) return [line];
+        if (product.stock <= 0) return [];
+        return [{ ...line, quantity: Math.min(line.quantity, product.stock) }];
+      }));
+
+      return nextProducts;
+    });
+  };
+
+  const deleteProduct = (productId: string) => {
+    setProducts(prev => prev.filter(product => product.id !== productId));
+    setCart(prev => prev.filter(line => line.productId !== productId));
+    setActiveCheckout(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        orderLines: prev.orderLines.filter(line => line.productId !== productId),
+      };
+    });
+  };
+
+  const syncBchRate = () => {
+    const drift = (Math.random() * 0.08) - 0.04;
+    const nextRate = roundTo(Math.min(700, Math.max(180, bchUsdRate * (1 + drift))), 2);
+    setBchUsdRate(nextRate);
+    setLastRateSyncAt(new Date());
+    setProducts(prev => withRate(prev, nextRate));
+  };
+
   const addToCart = (productId: string) => {
     setCart(prev => {
+      const product = products.find(item => item.id === productId);
+      if (!product) return prev;
       const existing = prev.find(line => line.productId === productId);
+      const nextQty = existing ? existing.quantity + 1 : 1;
+      if (product.stock !== UNLIMITED_STOCK && nextQty > product.stock) return prev;
       if (!existing) return [...prev, { productId, quantity: 1 }];
-      return prev.map(line => line.productId === productId ? { ...line, quantity: line.quantity + 1 } : line);
+      return prev.map(line => line.productId === productId ? { ...line, quantity: nextQty } : line);
     });
   };
 
   const updateCartQuantity = (productId: string, quantity: number) => {
     setCart(prev => {
       if (quantity <= 0) return prev.filter(line => line.productId !== productId);
+      const product = products.find(item => item.id === productId);
+      if (!product) return prev.filter(line => line.productId !== productId);
+      const safeQuantity = product.stock === UNLIMITED_STOCK ? quantity : Math.min(quantity, product.stock);
+      if (safeQuantity <= 0) return prev.filter(line => line.productId !== productId);
       const existing = prev.find(line => line.productId === productId);
-      if (!existing) return [...prev, { productId, quantity }];
-      return prev.map(line => line.productId === productId ? { ...line, quantity } : line);
+      if (!existing) return [...prev, { productId, quantity: safeQuantity }];
+      return prev.map(line => line.productId === productId ? { ...line, quantity: safeQuantity } : line);
     });
   };
 
@@ -250,6 +371,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       status: 'awaiting_payment',
       tokenReward,
       receiptNftId,
+      orderLines: cart.map(line => ({ productId: line.productId, quantity: line.quantity })),
     });
     setCart([]);
   };
@@ -269,6 +391,16 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         receiptNftId: activeCheckout.receiptNftId,
       };
     }));
+
+    if (activeCheckout.orderLines.length > 0) {
+      setProducts(prevProducts => prevProducts.map(product => {
+        const orderedLine = activeCheckout.orderLines.find(line => line.productId === product.id);
+        if (!orderedLine) return product;
+        if (product.stock === UNLIMITED_STOCK) return product;
+        const nextStock = Math.max(0, product.stock - orderedLine.quantity);
+        return { ...product, stock: nextStock };
+      }));
+    }
 
     setActiveCheckout(prev => prev ? { ...prev, status: 'confirmed' } : null);
   };
@@ -296,6 +428,8 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     <DemoDataContext.Provider
       value={{
         products,
+        bchUsdRate,
+        lastRateSyncAt,
         transactions,
         cartLines,
         cartCount,
@@ -304,6 +438,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         customerWallet,
         activeCheckout,
         dashboardMetrics,
+        createProduct,
+        updateProduct,
+        deleteProduct,
+        syncBchRate,
         addToCart,
         updateCartQuantity,
         clearCart,
