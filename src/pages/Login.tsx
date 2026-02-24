@@ -1,17 +1,15 @@
 import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { CheckCircle2, LogIn, Mail, Wallet, Zap, Rocket } from 'lucide-react';
+import { CheckCircle2, Mail, Wallet, Zap } from 'lucide-react';
 
 export function Login() {
   const { isDark, toggleTheme } = useTheme();
-  const { googleEmail, walletAddress, connectGoogle, connectWallet, quickDemoLogin } = useAuth();
-  const [emailInput, setEmailInput] = useState(googleEmail ?? '');
-  const [walletInput, setWalletInput] = useState(walletAddress ?? '');
+  const { googleEmail, walletAddress, connectGoogle, connectWallet } = useAuth();
   const [error, setError] = useState('');
 
   const handleConnectGoogle = () => {
-    const result = connectGoogle(emailInput);
+    const result = connectGoogle('demo.ncash@gmail.com');
     if (!result.ok) {
       setError(result.error);
       return;
@@ -20,7 +18,7 @@ export function Login() {
   };
 
   const handleConnectWallet = () => {
-    const result = connectWallet(walletInput);
+    const result = connectWallet('bitcoincash:qdemo...wallet');
     if (!result.ok) {
       setError(result.error);
       return;
@@ -58,81 +56,57 @@ export function Login() {
           </div>
 
           <p className={`mb-5 text-sm ${isDark ? 'text-nexus-gray' : 'text-nexus-sub-light'}`}>
-            Sebelum masuk dashboard, user harus login pakai <span className="font-semibold text-nexus-green">Gmail Google</span> dan
-            menghubungkan <span className="font-semibold text-nexus-cyan">Wallet BCH</span>.
+            Klik ikon <span className="font-semibold text-nexus-green">Gmail</span> dan <span className="font-semibold text-nexus-cyan">Wallet BCH</span> untuk login demo.
           </p>
 
-          <button
-            onClick={quickDemoLogin}
-            className="mb-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-nexus-green to-nexus-cyan px-4 py-2 text-xs font-bold text-white shadow-lg shadow-nexus-green/20 cursor-pointer"
-          >
-            <Rocket className="h-3.5 w-3.5" />
-            Quick Demo Login (1 klik)
-          </button>
-
-          <div className="space-y-4">
-            <div className={`rounded-2xl p-4 ${isDark ? 'bg-white/5' : 'bg-white/80'}`}>
-              <div className="mb-3 flex items-center gap-2">
-                <Mail className="h-4 w-4 text-nexus-green" />
+          <div className="grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
+            <button
+              onClick={handleConnectGoogle}
+              className={`rounded-2xl border p-5 text-left transition-all cursor-pointer ${
+                googleEmail
+                  ? 'border-nexus-green/40 bg-nexus-green/10'
+                  : isDark
+                    ? 'border-white/10 bg-white/5 hover:border-nexus-green/30'
+                    : 'border-nexus-border-light bg-white/80 hover:border-nexus-green/30'
+              }`}
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <Mail className="h-5 w-5 text-nexus-green" />
                 <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-nexus-text-light'}`}>Google Gmail</h3>
               </div>
-              <input
-                type="email"
-                value={emailInput}
-                onChange={e => setEmailInput(e.target.value)}
-                placeholder="nama@gmail.com"
-                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ${
-                  isDark
-                    ? 'border-white/10 bg-white/5 text-white placeholder-nexus-gray'
-                    : 'border-nexus-border-light bg-white text-nexus-text-light placeholder-nexus-sub-light'
-                }`}
-              />
-              <button
-                onClick={handleConnectGoogle}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-nexus-green px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-nexus-green-dark cursor-pointer"
-              >
-                <LogIn className="h-4 w-4" />
-                Connect Google
-              </button>
+              <p className={`text-xs ${isDark ? 'text-nexus-gray' : 'text-nexus-sub-light'}`}>
+                Tap icon untuk connect
+              </p>
               {googleEmail && (
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-nexus-green">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> {googleEmail}
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Connected
                 </p>
               )}
-            </div>
+            </button>
 
-            <div className={`rounded-2xl p-4 ${isDark ? 'bg-white/5' : 'bg-white/80'}`}>
-              <div className="mb-3 flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-nexus-cyan" />
+            <button
+              onClick={handleConnectWallet}
+              className={`rounded-2xl border p-5 text-left transition-all cursor-pointer ${
+                walletAddress
+                  ? 'border-nexus-cyan/40 bg-nexus-cyan/10'
+                  : isDark
+                    ? 'border-white/10 bg-white/5 hover:border-nexus-cyan/30'
+                    : 'border-nexus-border-light bg-white/80 hover:border-nexus-cyan/30'
+              }`}
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-nexus-cyan" />
                 <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-nexus-text-light'}`}>BCH Wallet</h3>
               </div>
-              <input
-                type="text"
-                value={walletInput}
-                onChange={e => setWalletInput(e.target.value)}
-                placeholder="bitcoincash:q..."
-                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ${
-                  isDark
-                    ? 'border-white/10 bg-white/5 text-white placeholder-nexus-gray'
-                    : 'border-nexus-border-light bg-white text-nexus-text-light placeholder-nexus-sub-light'
-                }`}
-              />
-              <button
-                onClick={handleConnectWallet}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-nexus-cyan px-4 py-2.5 text-xs font-bold text-white transition-all hover:opacity-90 cursor-pointer"
-              >
-                <LogIn className="h-4 w-4" />
-                Connect Wallet
-              </button>
+              <p className={`text-xs ${isDark ? 'text-nexus-gray' : 'text-nexus-sub-light'}`}>
+                Tap icon untuk connect
+              </p>
               {walletAddress && (
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-nexus-green">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> {walletAddress}
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Connected
                 </p>
               )}
-              <p className={`mt-2 text-[11px] ${textSubClass(isDark)}`}>
-                Demo format: `bitcoincash:qdemo...wallet`
-              </p>
-            </div>
+            </button>
           </div>
 
           {error && (
@@ -144,8 +118,4 @@ export function Login() {
       </div>
     </div>
   );
-}
-
-function textSubClass(isDark: boolean) {
-  return isDark ? 'text-nexus-gray' : 'text-nexus-sub-light';
 }
