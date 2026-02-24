@@ -1,34 +1,134 @@
+import { useMemo, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useDemoData, type DemoTransaction } from '../context/DemoDataContext';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell
+  BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts';
 import { TrendingUp, TrendingDown, ArrowUpRight, Coins, Receipt, Users, Wallet, type LucideIcon } from 'lucide-react';
-import { useDemoData } from '../context/DemoDataContext';
 
-const revenueData = [
-  { day: 'Mon', bch: 0.42, fiat: 126 },
-  { day: 'Tue', bch: 0.68, fiat: 204 },
-  { day: 'Wed', bch: 0.55, fiat: 165 },
-  { day: 'Thu', bch: 0.91, fiat: 273 },
-  { day: 'Fri', bch: 1.23, fiat: 369 },
-  { day: 'Sat', bch: 1.56, fiat: 468 },
-  { day: 'Sun', bch: 1.12, fiat: 336 },
-];
+type TrendWindow = 'daily' | 'weekly' | 'monthly';
 
-const hourlyData = [
-  { hour: '08', tx: 4 }, { hour: '09', tx: 8 }, { hour: '10', tx: 12 },
-  { hour: '11', tx: 18 }, { hour: '12', tx: 25 }, { hour: '13', tx: 22 },
-  { hour: '14', tx: 15 }, { hour: '15', tx: 19 }, { hour: '16', tx: 23 },
-  { hour: '17', tx: 28 }, { hour: '18', tx: 20 }, { hour: '19', tx: 14 },
-  { hour: '20', tx: 8 },
-];
+interface ParsedTransaction extends DemoTransaction {
+  timestamp: Date;
+}
 
-const tokenDistribution = [
-  { name: 'Distributed', value: 45000, color: '#0AC18E' },
-  { name: 'Available', value: 35000, color: '#00E5FF' },
-  { name: 'Burned', value: 20000, color: '#FF4C4C' },
-];
+interface TrendPoint {
+  label: string;
+  bch: number;
+  fiat: number;
+}
+
+function toLocalDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseTransactionTimestamp(tx: DemoTransaction): Date {
+  const parsed = new Date(`${tx.date}T${tx.time}:00`);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+  return new Date(`${tx.date}T00:00:00`);
+}
+
+function startOfDay(value: Date): Date {
+  const next = new Date(value);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(value: Date, amount: number): Date {
+  const next = new Date(value);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function startOfWeek(value: Date): Date {
+  const day = value.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  return startOfDay(addDays(value, diff));
+}
+
+function sumBch(transactions: ParsedTransaction[]): number {
+  return Number(transactions.reduce((total, tx) => total + tx.bch, 0).toFixed(4));
+}
+
+function sumTokens(transactions: ParsedTransaction[]): number {
+  return transactions.reduce((total, tx) => total + tx.tokensGiven, 0);
+}
+
+function uniqueCustomers(transactions: ParsedTransaction[]): number {
+  return new Set(transactions.map(tx => tx.customer)).size;
+}
+
+function computeChangePct(current: number, previous: number): number {
+  if (previous === 0) return current === 0 ? 0 : 100;
+  return ((current - previous) / previous) * 100;
+}
+
+function pctLabel(value: number): string {
+  const prefix = value >= 0 ? '+' : '';
+  return `${prefix}${value.toFixed(1)}%`;
+}
+
+function buildTrendData(transactions: ParsedTransaction[], window: TrendWindow): TrendPoint[] {
+  const now = new Date();
+  const today = startOfDay(now);
+
+  if (window === 'daily') {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = addDays(today, index - 6);
+      const nextDate = addDays(date, 1);
+      const bucket = transactions.filter(tx => tx.timestamp >= date && tx.timestamp < nextDate);
+      return {
+        label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        bch: Number(bucket.reduce((sum, tx) => sum + tx.bch, 0).toFixed(4)),
+        fiat: Number(bucket.reduce((sum, tx) => sum + tx.fiat, 0).toFixed(2)),
+      };
+    });
+  }
+
+  if (window === 'weekly') {
+    const currentWeekStart = startOfWeek(now);
+    return Array.from({ length: 6 }, (_, index) => {
+      const weekStart = addDays(currentWeekStart, (index - 5) * 7);
+      const weekEnd = addDays(weekStart, 7);
+      const bucket = transactions.filter(tx => tx.timestamp >= weekStart && tx.timestamp < weekEnd);
+      return {
+        label: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        bch: Number(bucket.reduce((sum, tx) => sum + tx.bch, 0).toFixed(4)),
+        fiat: Number(bucket.reduce((sum, tx) => sum + tx.fiat, 0).toFixed(2)),
+      };
+    });
+  }
+
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(monthStart.getFullYear(), monthStart.getMonth() + index - 5, 1);
+    const nextDate = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+    const bucket = transactions.filter(tx => tx.timestamp >= date && tx.timestamp < nextDate);
+    return {
+      label: date.toLocaleDateString('en-US', { month: 'short' }),
+      bch: Number(bucket.reduce((sum, tx) => sum + tx.bch, 0).toFixed(4)),
+      fiat: Number(bucket.reduce((sum, tx) => sum + tx.fiat, 0).toFixed(2)),
+    };
+  });
+}
+
+function buildHourlyData(transactions: ParsedTransaction[]) {
+  const today = toLocalDate(new Date());
+  const hours = Array.from({ length: 13 }, (_, index) => 8 + index);
+
+  return hours.map(hour => {
+    const count = transactions.filter(tx => {
+      if (toLocalDate(tx.timestamp) !== today) return false;
+      return tx.timestamp.getHours() === hour;
+    }).length;
+
+    return { hour: String(hour).padStart(2, '0'), tx: count };
+  });
+}
 
 function StatCard({ icon: Icon, label, value, change, positive, isDark, delay }: {
   icon: LucideIcon;
@@ -59,51 +159,142 @@ function StatCard({ icon: Icon, label, value, change, positive, isDark, delay }:
       </div>
       <p className={`mt-4 text-3xl font-extrabold tracking-tight ${isDark ? 'text-white' : 'text-nexus-text-light'}`}>{value}</p>
       <p className={`mt-1 text-xs ${isDark ? 'text-nexus-gray' : 'text-nexus-sub-light'}`}>
-        Weekly performance status
+        Live demo metrics from transaction stream
       </p>
     </div>
   );
 }
 
-export function Dashboard() {
+export function Dashboard({ onOpenTransactions }: { onOpenTransactions?: () => void } = {}) {
   const { isDark } = useTheme();
   const { transactions, dashboardMetrics } = useDemoData();
+  const [trendWindow, setTrendWindow] = useState<TrendWindow>('daily');
   const textMain = isDark ? 'text-white' : 'text-nexus-text-light';
   const textSub = isDark ? 'text-nexus-gray' : 'text-nexus-sub-light';
   const chartGrid = isDark ? '#2a3f42' : '#9fc3ba';
-  const recentTransactions = transactions.slice(0, 5);
+
+  const parsedTransactions = useMemo<ParsedTransaction[]>(
+    () => transactions
+      .map(tx => ({ ...tx, timestamp: parseTransactionTimestamp(tx) }))
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()),
+    [transactions],
+  );
+
+  const trendData = useMemo(
+    () => buildTrendData(parsedTransactions, trendWindow),
+    [parsedTransactions, trendWindow],
+  );
+
+  const hourlyData = useMemo(
+    () => buildHourlyData(parsedTransactions),
+    [parsedTransactions],
+  );
+
+  const weeklyComparative = useMemo(() => {
+    const now = new Date();
+    const weekStart = startOfWeek(now);
+    const previousWeekStart = addDays(weekStart, -7);
+    const previousWeekEnd = weekStart;
+    const weekEnd = addDays(weekStart, 7);
+
+    const current = parsedTransactions.filter(tx => tx.timestamp >= weekStart && tx.timestamp < weekEnd);
+    const previous = parsedTransactions.filter(tx => tx.timestamp >= previousWeekStart && tx.timestamp < previousWeekEnd);
+
+    return {
+      currentBch: sumBch(current),
+      previousBch: sumBch(previous),
+      currentCount: current.length,
+      previousCount: previous.length,
+      currentMinted: sumTokens(current),
+      previousMinted: sumTokens(previous),
+      currentActiveCustomers: uniqueCustomers(current),
+      previousActiveCustomers: uniqueCustomers(previous),
+    };
+  }, [parsedTransactions]);
+
+  const bchChange = computeChangePct(weeklyComparative.currentBch, weeklyComparative.previousBch);
+  const txChange = computeChangePct(weeklyComparative.currentCount, weeklyComparative.previousCount);
+  const tokenChange = computeChangePct(weeklyComparative.currentMinted, weeklyComparative.previousMinted);
+  const customerChange = computeChangePct(weeklyComparative.currentActiveCustomers, weeklyComparative.previousActiveCustomers);
+
+  const tokenDistribution = useMemo(() => {
+    const totalSupply = 100_000;
+    const burned = 20_000;
+    const distributed = dashboardMetrics.mintedTokens;
+    const available = Math.max(totalSupply - burned - distributed, 0);
+    return [
+      { name: 'Distributed', value: distributed, color: '#0AC18E' },
+      { name: 'Available', value: available, color: '#00E5FF' },
+      { name: 'Burned', value: burned, color: '#FF4C4C' },
+    ];
+  }, [dashboardMetrics.mintedTokens]);
+
+  const recentTransactions = parsedTransactions.slice(0, 5);
 
   return (
     <div className="space-y-5">
       <div className="neo-page-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Wallet} label="Total BCH Volume" value={`${dashboardMetrics.totalBch.toFixed(4)} BCH`} change="+23.5%" positive={true} isDark={isDark} delay={0} />
-        <StatCard icon={Receipt} label="Total Transactions" value={dashboardMetrics.totalTransactions.toString()} change="+12.3%" positive={true} isDark={isDark} delay={80} />
-        <StatCard icon={Coins} label="CashTokens Minted" value={dashboardMetrics.mintedTokens.toLocaleString()} change="+8.7%" positive={true} isDark={isDark} delay={140} />
-        <StatCard icon={Users} label="Active Customers" value={dashboardMetrics.activeCustomers.toString()} change="-2.1%" positive={false} isDark={isDark} delay={200} />
+        <StatCard
+          icon={Wallet}
+          label="Total BCH This Week"
+          value={`${weeklyComparative.currentBch.toFixed(4)} BCH`}
+          change={pctLabel(bchChange)}
+          positive={bchChange >= 0}
+          isDark={isDark}
+          delay={0}
+        />
+        <StatCard
+          icon={Receipt}
+          label="Total Transactions"
+          value={weeklyComparative.currentCount.toString()}
+          change={pctLabel(txChange)}
+          positive={txChange >= 0}
+          isDark={isDark}
+          delay={80}
+        />
+        <StatCard
+          icon={Coins}
+          label="CashTokens Minted"
+          value={weeklyComparative.currentMinted.toLocaleString()}
+          change={pctLabel(tokenChange)}
+          positive={tokenChange >= 0}
+          isDark={isDark}
+          delay={140}
+        />
+        <StatCard
+          icon={Users}
+          label="Active Customers"
+          value={weeklyComparative.currentActiveCustomers.toString()}
+          change={pctLabel(customerChange)}
+          positive={customerChange >= 0}
+          isDark={isDark}
+          delay={200}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="neo-panel neo-cut p-5 xl:col-span-2">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className={`font-bold ${textMain}`}>Daily BCH Volume</h3>
-              <p className={`text-xs ${textSub}`}>Trend over the last 7 days</p>
+              <h3 className={`font-bold ${textMain}`}>BCH Volume Trend</h3>
+              <p className={`text-xs ${textSub}`}>Live aggregate from transaction feed</p>
             </div>
             <div className="flex gap-1">
-              {['Daily', 'Weekly', 'Monthly'].map((label, i) => (
+              {(['daily', 'weekly', 'monthly'] as const).map(label => (
                 <button
                   key={label}
+                  onClick={() => setTrendWindow(label)}
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer
-                    ${i === 0 ? 'bg-nexus-green/15 text-nexus-green' : isDark ? 'text-nexus-gray hover:bg-white/8' : 'text-nexus-sub-light hover:bg-white/60'}
+                    ${trendWindow === label ? 'bg-nexus-green/15 text-nexus-green' : isDark ? 'text-nexus-gray hover:bg-white/8' : 'text-nexus-sub-light hover:bg-white/60'}
                   `}
                 >
-                  {label}
+                  {label[0].toUpperCase() + label.slice(1)}
                 </button>
               ))}
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={revenueData}>
+            <AreaChart data={trendData}>
               <defs>
                 <linearGradient id="bchGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#0AC18E" stopOpacity={0.3} />
@@ -111,7 +302,7 @@ export function Dashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="4 4" stroke={chartGrid} />
-              <XAxis dataKey="day" tick={{ fill: isDark ? '#A0AAB2' : '#23474b', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="label" tick={{ fill: isDark ? '#A0AAB2' : '#23474b', fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: isDark ? '#A0AAB2' : '#23474b', fontSize: 12 }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{
@@ -119,7 +310,7 @@ export function Dashboard() {
                   border: isDark ? '1px solid rgba(136, 193, 180, 0.25)' : '1px solid #9bc8bc',
                   borderRadius: '12px',
                   color: isDark ? '#fff' : '#1a202c',
-                  fontSize: '12px'
+                  fontSize: '12px',
                 }}
               />
               <Area type="monotone" dataKey="bch" stroke="#0AC18E" fill="url(#bchGrad)" strokeWidth={2.5} dot={{ fill: '#0AC18E', r: 4 }} />
@@ -129,7 +320,7 @@ export function Dashboard() {
 
         <div className="neo-panel p-5">
           <h3 className={`mb-1 font-bold ${textMain}`}>Token Distribution</h3>
-          <p className={`mb-4 text-xs ${textSub}`}>$NEXUS points supply</p>
+          <p className={`mb-4 text-xs ${textSub}`}>Computed from live minted points</p>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={tokenDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" stroke="none">
@@ -143,7 +334,7 @@ export function Dashboard() {
                   border: isDark ? '1px solid rgba(136, 193, 180, 0.25)' : '1px solid #9bc8bc',
                   borderRadius: '12px',
                   color: isDark ? '#fff' : '#1a202c',
-                  fontSize: '12px'
+                  fontSize: '12px',
                 }}
               />
             </PieChart>
@@ -165,7 +356,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="neo-panel p-5">
           <h3 className={`mb-1 font-bold ${textMain}`}>Hourly Transactions</h3>
-          <p className={`mb-4 text-xs ${textSub}`}>Today</p>
+          <p className={`mb-4 text-xs ${textSub}`}>Today (08:00 - 20:00)</p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={hourlyData}>
               <CartesianGrid strokeDasharray="4 4" stroke={chartGrid} />
@@ -177,7 +368,7 @@ export function Dashboard() {
                   border: isDark ? '1px solid rgba(136, 193, 180, 0.25)' : '1px solid #9bc8bc',
                   borderRadius: '12px',
                   color: isDark ? '#fff' : '#1a202c',
-                  fontSize: '12px'
+                  fontSize: '12px',
                 }}
               />
               <Bar dataKey="tx" fill="#00E5FF" radius={[4, 4, 0, 0]} />
@@ -191,7 +382,10 @@ export function Dashboard() {
               <h3 className={`font-bold ${textMain}`}>Latest Transactions</h3>
               <p className={`text-xs ${textSub}`}>5 most recent transactions</p>
             </div>
-            <button className="flex items-center gap-1 text-xs font-semibold text-nexus-green hover:underline cursor-pointer">
+            <button
+              onClick={() => onOpenTransactions?.()}
+              className="flex items-center gap-1 text-xs font-semibold text-nexus-green hover:underline cursor-pointer"
+            >
               View All <ArrowUpRight className="h-3 w-3" />
             </button>
           </div>

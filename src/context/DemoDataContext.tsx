@@ -85,17 +85,6 @@ const demoProducts: DemoProduct[] = [
   { id: '8', name: 'Cheesecake Slice', sku: 'FOD-005', price: 1.86, priceBch: 0.0062, stock: 15, category: 'Food', image: 'CK' },
 ];
 
-const seedTransactions: DemoTransaction[] = [
-  { id: 'TX-0042', customer: 'bitcoincash:qz3f...8a2c', items: ['Americano Coffee x2', 'Butter Croissant x1'], bch: 0.0152, fiat: 4.56, status: 'confirmed', time: '14:32', date: '2024-01-15', nftMinted: true, tokensGiven: 46, blockHeight: 831204, receiptNftId: 'NFT-RCP-0042', source: 'seed' },
-  { id: 'TX-0041', customer: 'bitcoincash:qp7b...1d4e', items: ['Matcha Latte x1'], bch: 0.0071, fiat: 2.13, status: 'confirmed', time: '14:24', date: '2024-01-15', nftMinted: true, tokensGiven: 21, blockHeight: 831203, receiptNftId: 'NFT-RCP-0041', source: 'seed' },
-  { id: 'TX-0040', customer: 'bitcoincash:qa1x...9f3b', items: ['Classic Burger x1', 'Fresh Orange Juice x2', 'Carbonara Pasta x1', 'Cheesecake Slice x1'], bch: 0.0328, fiat: 9.84, status: 'pending', time: '14:18', date: '2024-01-15', nftMinted: false, tokensGiven: 0, blockHeight: null, source: 'seed' },
-  { id: 'TX-0039', customer: 'bitcoincash:qc8m...2e7a', items: ['Special Fried Rice x1', 'Americano Coffee x1'], bch: 0.0134, fiat: 4.02, status: 'confirmed', time: '13:55', date: '2024-01-15', nftMinted: true, tokensGiven: 40, blockHeight: 831201, receiptNftId: 'NFT-RCP-0039', source: 'seed' },
-  { id: 'TX-0038', customer: 'bitcoincash:q5dr...4c1f', items: ['Carbonara Pasta x2'], bch: 0.0214, fiat: 6.42, status: 'failed', time: '13:42', date: '2024-01-15', nftMinted: false, tokensGiven: 0, blockHeight: null, source: 'seed' },
-  { id: 'TX-0037', customer: 'bitcoincash:qe9k...7b5d', items: ['Cheesecake Slice x3'], bch: 0.0186, fiat: 5.58, status: 'confirmed', time: '13:15', date: '2024-01-15', nftMinted: true, tokensGiven: 56, blockHeight: 831198, receiptNftId: 'NFT-RCP-0037', source: 'seed' },
-  { id: 'TX-0036', customer: 'bitcoincash:qf2n...3a8e', items: ['Americano Coffee x1', 'Matcha Latte x1'], bch: 0.0127, fiat: 3.81, status: 'confirmed', time: '12:48', date: '2024-01-15', nftMinted: true, tokensGiven: 38, blockHeight: 831195, receiptNftId: 'NFT-RCP-0036', source: 'seed' },
-  { id: 'TX-0035', customer: 'bitcoincash:qg6p...9d2c', items: ['Classic Burger x2', 'Fresh Orange Juice x2'], bch: 0.0274, fiat: 8.22, status: 'confirmed', time: '12:20', date: '2024-01-15', nftMinted: true, tokensGiven: 82, blockHeight: 831192, receiptNftId: 'NFT-RCP-0035', source: 'seed' },
-];
-
 const merchantAddress = 'bitcoincash:qph7w9merchant8qv8xdem0m28jk4alhjk2jv7r3';
 
 const DemoDataContext = createContext<DemoDataContextValue | undefined>(undefined);
@@ -105,11 +94,64 @@ function roundTo(value: number, digits: number): number {
   return Math.round(value * base) / base;
 }
 
+function formatLocalDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatLocalTime(value: Date): string {
+  const hour = String(value.getHours()).padStart(2, '0');
+  const minute = String(value.getMinutes()).padStart(2, '0');
+  return `${hour}:${minute}`;
+}
+
 function getNowParts() {
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
-  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  return { date, time };
+  return { date: formatLocalDate(now), time: formatLocalTime(now) };
+}
+
+function buildSeedTimestamp(dayOffset: number, hour: number, minute: number) {
+  const value = new Date();
+  value.setDate(value.getDate() - dayOffset);
+  value.setHours(hour, minute, 0, 0);
+  return {
+    date: formatLocalDate(value),
+    time: formatLocalTime(value),
+  };
+}
+
+function createSeedTransactions(): DemoTransaction[] {
+  const templates = [
+    { id: 'TX-0042', customer: 'bitcoincash:qz3f...8a2c', items: ['Americano Coffee x2', 'Butter Croissant x1'], bch: 0.0152, fiat: 4.56, status: 'confirmed' as const, token: 46, block: 831204, nft: 'NFT-RCP-0042', dayOffset: 0, hour: 14, minute: 32 },
+    { id: 'TX-0041', customer: 'bitcoincash:qp7b...1d4e', items: ['Matcha Latte x1'], bch: 0.0071, fiat: 2.13, status: 'confirmed' as const, token: 21, block: 831203, nft: 'NFT-RCP-0041', dayOffset: 0, hour: 14, minute: 24 },
+    { id: 'TX-0040', customer: 'bitcoincash:qa1x...9f3b', items: ['Classic Burger x1', 'Fresh Orange Juice x2', 'Carbonara Pasta x1', 'Cheesecake Slice x1'], bch: 0.0328, fiat: 9.84, status: 'pending' as const, token: 0, block: null, nft: undefined, dayOffset: 1, hour: 13, minute: 55 },
+    { id: 'TX-0039', customer: 'bitcoincash:qc8m...2e7a', items: ['Special Fried Rice x1', 'Americano Coffee x1'], bch: 0.0134, fiat: 4.02, status: 'confirmed' as const, token: 40, block: 831201, nft: 'NFT-RCP-0039', dayOffset: 2, hour: 13, minute: 15 },
+    { id: 'TX-0038', customer: 'bitcoincash:q5dr...4c1f', items: ['Carbonara Pasta x2'], bch: 0.0214, fiat: 6.42, status: 'failed' as const, token: 0, block: null, nft: undefined, dayOffset: 3, hour: 12, minute: 48 },
+    { id: 'TX-0037', customer: 'bitcoincash:qe9k...7b5d', items: ['Cheesecake Slice x3'], bch: 0.0186, fiat: 5.58, status: 'confirmed' as const, token: 56, block: 831198, nft: 'NFT-RCP-0037', dayOffset: 4, hour: 12, minute: 20 },
+    { id: 'TX-0036', customer: 'bitcoincash:qf2n...3a8e', items: ['Americano Coffee x1', 'Matcha Latte x1'], bch: 0.0127, fiat: 3.81, status: 'confirmed' as const, token: 38, block: 831195, nft: 'NFT-RCP-0036', dayOffset: 5, hour: 11, minute: 42 },
+    { id: 'TX-0035', customer: 'bitcoincash:qg6p...9d2c', items: ['Classic Burger x2', 'Fresh Orange Juice x2'], bch: 0.0274, fiat: 8.22, status: 'confirmed' as const, token: 82, block: 831192, nft: 'NFT-RCP-0035', dayOffset: 6, hour: 10, minute: 18 },
+  ];
+
+  return templates.map(template => {
+    const timestamp = buildSeedTimestamp(template.dayOffset, template.hour, template.minute);
+    return {
+      id: template.id,
+      customer: template.customer,
+      items: template.items,
+      bch: template.bch,
+      fiat: template.fiat,
+      status: template.status,
+      time: timestamp.time,
+      date: timestamp.date,
+      nftMinted: Boolean(template.nft),
+      tokensGiven: template.token,
+      blockHeight: template.block,
+      receiptNftId: template.nft,
+      source: 'seed' as const,
+    };
+  });
 }
 
 function getNextTransactionId(transactions: DemoTransaction[]): string {
@@ -122,7 +164,7 @@ function getNextTransactionId(transactions: DemoTransaction[]): string {
 
 export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [products] = useState<DemoProduct[]>(demoProducts);
-  const [transactions, setTransactions] = useState<DemoTransaction[]>(seedTransactions);
+  const [transactions, setTransactions] = useState<DemoTransaction[]>(() => createSeedTransactions());
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerWallet, setCustomerWallet] = useState('bitcoincash:qrx9...newbuyer');
   const [activeCheckout, setActiveCheckout] = useState<CheckoutSession | null>(null);

@@ -31,7 +31,7 @@ function AppContent() {
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard': return <Dashboard />;
+      case 'dashboard': return <Dashboard onOpenTransactions={() => setActivePage('transactions')} />;
       case 'products': return <Products onOpenCheckout={() => setActivePage('checkout')} />;
       case 'transactions': return <Transactions />;
       case 'checkout': return <Checkout onOpenProducts={() => setActivePage('products')} />;
