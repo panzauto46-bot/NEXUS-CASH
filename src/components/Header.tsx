@@ -1,5 +1,6 @@
 import { useTheme } from '../context/ThemeContext';
-import { Sun, Moon, Bell, Search, Wallet } from 'lucide-react';
+import { Sun, Moon, Bell, Search, Wallet, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const pageTitles: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -14,7 +15,9 @@ const pageTitles: Record<string, string> = {
 
 export function Header({ activePage }: { activePage: string }) {
   const { isDark, toggleTheme } = useTheme();
+  const { googleEmail, logout } = useAuth();
   const title = pageTitles[activePage] || 'Dashboard';
+  const userInitial = (googleEmail?.[0] ?? 'U').toUpperCase();
 
   return (
     <header className="neo-panel neo-header sticky top-3 z-30 flex min-h-18 flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
@@ -68,9 +71,16 @@ export function Header({ activePage }: { activePage: string }) {
         </button>
 
         {/* Avatar */}
-        <div className="ml-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-nexus-green to-nexus-cyan text-sm font-bold text-white shadow-lg shadow-nexus-green/20">
-          O
-        </div>
+        <button
+          onClick={logout}
+          title="Logout"
+          className="ml-1 flex items-center gap-1.5 rounded-2xl bg-gradient-to-br from-nexus-green to-nexus-cyan px-2.5 py-2 text-xs font-bold text-white shadow-lg shadow-nexus-green/20 cursor-pointer"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[11px]">
+            {userInitial}
+          </span>
+          <LogOut className="h-3.5 w-3.5" />
+        </button>
       </div>
     </header>
   );

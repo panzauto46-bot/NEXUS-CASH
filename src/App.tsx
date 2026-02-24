@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { DemoDataProvider } from './context/DemoDataContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -11,6 +12,7 @@ import { Treasury } from './pages/Treasury';
 import { Customers } from './pages/Customers';
 import { Employees } from './pages/Employees';
 import { Settings } from './pages/Settings';
+import { Login } from './pages/Login';
 
 function AppContent() {
   const { isDark } = useTheme();
@@ -63,12 +65,26 @@ function AppContent() {
   );
 }
 
+function AppGate() {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  return (
+    <DemoDataProvider>
+      <AppContent />
+    </DemoDataProvider>
+  );
+}
+
 export function App() {
   return (
     <ThemeProvider>
-      <DemoDataProvider>
-        <AppContent />
-      </DemoDataProvider>
+      <AuthProvider>
+        <AppGate />
+      </AuthProvider>
     </ThemeProvider>
   );
 }
