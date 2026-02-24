@@ -11,6 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   connectGoogle: (email: string) => { ok: true } | { ok: false; error: string };
   connectWallet: (wallet: string) => { ok: true } | { ok: false; error: string };
+  quickDemoLogin: () => void;
   logout: () => void;
 }
 
@@ -24,7 +25,8 @@ function validateGmail(email: string): boolean {
 
 function validateWallet(address: string): boolean {
   const trimmed = address.trim();
-  return trimmed.startsWith('bitcoincash:') && trimmed.length >= 24;
+  if (!trimmed.startsWith('bitcoincash:')) return false;
+  return trimmed.length >= 14;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -72,6 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  const quickDemoLogin = () => {
+    setGoogleEmail('demo.ncash@gmail.com');
+    setWalletAddress('bitcoincash:qdemo...wallet');
+  };
+
   const isAuthenticated = Boolean(googleEmail && walletAddress);
 
   const value = useMemo<AuthContextType>(() => ({
@@ -80,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated,
     connectGoogle,
     connectWallet,
+    quickDemoLogin,
     logout,
   }), [googleEmail, walletAddress, isAuthenticated]);
 
