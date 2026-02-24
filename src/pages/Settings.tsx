@@ -116,8 +116,8 @@ export function Settings() {
             <div>
               <label className={`text-xs font-semibold ${textSub}`}>Fiat Currency</label>
               <select className={`mt-1.5 w-full rounded-xl px-3 py-2.5 text-sm outline-none ${inputBg}`}>
-                <option>IDR - Rupiah</option>
                 <option>USD - US Dollar</option>
+                <option>EUR - Euro</option>
               </select>
             </div>
             <div>

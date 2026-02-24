@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { Plus, Search, Edit2, Trash2, Package, RefreshCw } from 'lucide-react';
+import { BCH_TO_USD, formatUsd } from '../utils/currency';
 
 interface Product {
   id: string;
@@ -14,14 +15,14 @@ interface Product {
 }
 
 const mockProducts: Product[] = [
-  { id: '1', name: 'Americano Coffee', sku: 'BEV-001', price: 25000, priceBch: 0.0056, stock: 999, category: 'Beverage', image: 'AM' },
-  { id: '2', name: 'Special Fried Rice', sku: 'FOD-001', price: 35000, priceBch: 0.0078, stock: 50, category: 'Food', image: 'FR' },
-  { id: '3', name: 'Butter Croissant', sku: 'FOD-002', price: 18000, priceBch: 0.0040, stock: 25, category: 'Food', image: 'CR' },
-  { id: '4', name: 'Matcha Latte', sku: 'BEV-002', price: 32000, priceBch: 0.0071, stock: 999, category: 'Beverage', image: 'ML' },
-  { id: '5', name: 'Classic Burger', sku: 'FOD-003', price: 42000, priceBch: 0.0093, stock: 30, category: 'Food', image: 'BG' },
-  { id: '6', name: 'Fresh Orange Juice', sku: 'BEV-003', price: 20000, priceBch: 0.0044, stock: 999, category: 'Beverage', image: 'OJ' },
-  { id: '7', name: 'Carbonara Pasta', sku: 'FOD-004', price: 48000, priceBch: 0.0107, stock: 20, category: 'Food', image: 'PS' },
-  { id: '8', name: 'Cheesecake Slice', sku: 'FOD-005', price: 28000, priceBch: 0.0062, stock: 15, category: 'Food', image: 'CK' },
+  { id: '1', name: 'Americano Coffee', sku: 'BEV-001', price: 1.68, priceBch: 0.0056, stock: 999, category: 'Beverage', image: 'AM' },
+  { id: '2', name: 'Special Fried Rice', sku: 'FOD-001', price: 2.34, priceBch: 0.0078, stock: 50, category: 'Food', image: 'FR' },
+  { id: '3', name: 'Butter Croissant', sku: 'FOD-002', price: 1.2, priceBch: 0.0040, stock: 25, category: 'Food', image: 'CR' },
+  { id: '4', name: 'Matcha Latte', sku: 'BEV-002', price: 2.13, priceBch: 0.0071, stock: 999, category: 'Beverage', image: 'ML' },
+  { id: '5', name: 'Classic Burger', sku: 'FOD-003', price: 2.79, priceBch: 0.0093, stock: 30, category: 'Food', image: 'BG' },
+  { id: '6', name: 'Fresh Orange Juice', sku: 'BEV-003', price: 1.32, priceBch: 0.0044, stock: 999, category: 'Beverage', image: 'OJ' },
+  { id: '7', name: 'Carbonara Pasta', sku: 'FOD-004', price: 3.21, priceBch: 0.0107, stock: 20, category: 'Food', image: 'PS' },
+  { id: '8', name: 'Cheesecake Slice', sku: 'FOD-005', price: 1.86, priceBch: 0.0062, stock: 15, category: 'Food', image: 'CK' },
 ];
 
 export function Products() {
@@ -87,7 +88,7 @@ export function Products() {
           </div>
           <div>
             <p className={`text-sm font-bold ${textMain}`}>Auto Conversion Engine</p>
-            <p className={`text-xs ${textSub}`}>1 BCH = IDR 4,500,000 | Updated 30s ago | Slippage: 0.5%</p>
+            <p className={`text-xs ${textSub}`}>1 BCH = {formatUsd(BCH_TO_USD)} | Updated 30s ago | Slippage: 0.5%</p>
           </div>
         </div>
         <span className="rounded-lg bg-nexus-green/15 px-3 py-1.5 text-[10px] font-bold uppercase text-nexus-green">Live</span>
@@ -113,7 +114,7 @@ export function Products() {
               </div>
               <div className="mt-3 flex items-end justify-between">
                 <div>
-                  <p className={`text-lg font-bold ${textMain}`}>IDR {product.price.toLocaleString()}</p>
+                  <p className={`text-lg font-bold ${textMain}`}>{formatUsd(product.price)}</p>
                   <p className="text-xs font-semibold text-nexus-green">{product.priceBch} BCH</p>
                 </div>
                 <div className="flex gap-1">

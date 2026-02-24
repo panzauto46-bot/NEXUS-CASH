@@ -1,6 +1,7 @@
 import { useTheme } from '../context/ThemeContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Coins, Send, ArrowDownToLine, Shield, Flame, TrendingUp, AlertTriangle, Wallet } from 'lucide-react';
+import { BCH_TO_USD, formatUsd } from '../utils/currency';
 
 const supplyHistory = [
   { day: 'Jan 1', supply: 100000, distributed: 0 },
@@ -24,6 +25,8 @@ export function Treasury() {
   const cardBg = 'neo-panel';
   const textMain = isDark ? 'text-white' : 'text-nexus-text-light';
   const textSub = isDark ? 'text-nexus-gray' : 'text-nexus-sub-light';
+  const hotWalletBch = 0.842;
+  const hotWalletUsd = hotWalletBch * BCH_TO_USD;
 
   return (
     <div className="space-y-6">
@@ -53,7 +56,7 @@ export function Treasury() {
             </div>
             <div>
               <h3 className={`text-lg font-bold ${textMain}`}>Settlement and Sweeping</h3>
-              <p className={`text-sm ${textSub}`}>Hot wallet balance: <span className="font-bold text-nexus-green">0.842 BCH</span> (~ IDR 3,789,000)</p>
+              <p className={`text-sm ${textSub}`}>Hot wallet balance: <span className="font-bold text-nexus-green">{hotWalletBch} BCH</span> (~ {formatUsd(hotWalletUsd)})</p>
             </div>
           </div>
           <div className="flex gap-3">

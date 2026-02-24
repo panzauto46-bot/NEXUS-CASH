@@ -6,13 +6,13 @@ import {
 import { TrendingUp, TrendingDown, ArrowUpRight, Coins, Receipt, Users, Wallet, type LucideIcon } from 'lucide-react';
 
 const revenueData = [
-  { day: 'Mon', bch: 0.42, fiat: 1890000 },
-  { day: 'Tue', bch: 0.68, fiat: 3060000 },
-  { day: 'Wed', bch: 0.55, fiat: 2475000 },
-  { day: 'Thu', bch: 0.91, fiat: 4095000 },
-  { day: 'Fri', bch: 1.23, fiat: 5535000 },
-  { day: 'Sat', bch: 1.56, fiat: 7020000 },
-  { day: 'Sun', bch: 1.12, fiat: 5040000 },
+  { day: 'Mon', bch: 0.42, fiat: 126 },
+  { day: 'Tue', bch: 0.68, fiat: 204 },
+  { day: 'Wed', bch: 0.55, fiat: 165 },
+  { day: 'Thu', bch: 0.91, fiat: 273 },
+  { day: 'Fri', bch: 1.23, fiat: 369 },
+  { day: 'Sat', bch: 1.56, fiat: 468 },
+  { day: 'Sun', bch: 1.12, fiat: 336 },
 ];
 
 const hourlyData = [
