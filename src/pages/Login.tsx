@@ -30,7 +30,7 @@ export function Login() {
 
   return (
     <div className={`min-h-screen p-4 sm:p-8 ${isDark ? 'bg-nexus-onyx' : 'bg-nexus-bg-light'}`}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 lg:flex-row">
+      <div className="mx-auto max-w-6xl">
         <div className="neo-panel flex-1 rounded-3xl p-6 sm:p-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -70,7 +70,7 @@ export function Login() {
             Quick Demo Login (1 klik)
           </button>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
             <div className={`rounded-2xl p-4 ${isDark ? 'bg-white/5' : 'bg-white/80'}`}>
               <div className="mb-3 flex items-center gap-2">
                 <Mail className="h-4 w-4 text-nexus-green" />
