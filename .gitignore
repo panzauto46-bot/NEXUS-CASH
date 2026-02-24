@@ -1,6 +1,10 @@
 node_modules/
 dist/
 .vercel/
+.gradle/
+android-app/.idea/
+android-app/local.properties
+local.properties
 
 .env
 .env.*
