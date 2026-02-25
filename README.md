@@ -9,6 +9,61 @@
 
 ---
 
+## 📸 Screenshots
+
+### Login & Authentication
+<p align="center">
+  <img src="docs/screenshots/login.jpg" alt="Login Screen" width="700"/>
+</p>
+<p align="center"><em>Connect with Gmail + BCH Wallet to access the POS system</em></p>
+
+### Dashboard & Analytics
+<p align="center">
+  <img src="docs/screenshots/dashboard.jpg" alt="Dashboard" width="700"/>
+</p>
+<p align="center"><em>Real-time revenue metrics, trend charts, and transaction overview</em></p>
+
+### Product Catalog & Checkout
+<p align="center">
+  <img src="docs/screenshots/products.jpg" alt="Product Catalog" width="700"/>
+</p>
+<p align="center"><em>Full product management with category filters and cart integration</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/checkout.jpg" alt="Live Checkout" width="700"/>
+</p>
+<p align="center"><em>BCH payment flow: QR code → Broadcast → Confirmation → Mint rewards</em></p>
+
+### Transactions & Treasury
+<p align="center">
+  <img src="docs/screenshots/transactions.jpg" alt="Transactions" width="700"/>
+</p>
+<p align="center"><em>Complete transaction history with advanced filters and CSV export</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/treasury.jpg" alt="CashToken Treasury" width="700"/>
+</p>
+<p align="center"><em>$NEXUS token treasury: supply management, sweep, burn, and mint controls</em></p>
+
+### Customers & Employees
+<p align="center">
+  <img src="docs/screenshots/customers.jpg" alt="Customers" width="700"/>
+</p>
+<p align="center"><em>Customer analytics with Gold/Silver/Bronze tier system</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/employees.jpg" alt="Employee Management" width="700"/>
+</p>
+<p align="center"><em>Employee management with roles, shifts, and status controls</em></p>
+
+### Settings
+<p align="center">
+  <img src="docs/screenshots/settings.jpg" alt="Settings" width="700"/>
+</p>
+<p align="center"><em>18+ configurable options: wallets, pricing, tokens, notifications, security</em></p>
+
+---
+
 ## 🎯 Problem Statement
 
 Small and medium merchants lack accessible tools to accept Bitcoin Cash payments. Existing crypto POS solutions are either too complex, too expensive, or don't leverage BCH's unique **CashTokens** capability for loyalty programs and digital receipts. There's a gap between the power of BCH's programmable layer and real-world merchant adoption.
