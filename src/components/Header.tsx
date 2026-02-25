@@ -1,6 +1,7 @@
 import { useTheme } from '../context/ThemeContext';
 import { Sun, Moon, Bell, Search, Wallet, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useDemoData } from '../context/DemoDataContext';
 
 const pageTitles: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -16,6 +17,7 @@ const pageTitles: Record<string, string> = {
 export function Header({ activePage }: { activePage: string }) {
   const { isDark, toggleTheme } = useTheme();
   const { googleEmail, logout } = useAuth();
+  const { treasurySnapshot } = useDemoData();
   const title = pageTitles[activePage] || 'Dashboard';
   const userInitial = (googleEmail?.[0] ?? 'U').toUpperCase();
 
@@ -48,7 +50,7 @@ export function Header({ activePage }: { activePage: string }) {
         {/* Wallet status */}
         <div className={`neo-wallet-pill hidden items-center gap-2 px-3 py-2 text-xs font-semibold sm:flex ${isDark ? 'text-nexus-green' : 'text-nexus-green-dark'}`}>
           <Wallet className="h-4 w-4" />
-          <span>0.842 BCH</span>
+          <span>{treasurySnapshot.hotWalletBch.toFixed(3)} BCH</span>
         </div>
 
         {/* Notifications */}

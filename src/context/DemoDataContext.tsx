@@ -87,6 +87,46 @@ export interface TreasurySweepEvent {
   coldWalletAfterBch: number;
 }
 
+export type EmployeeRole = 'owner' | 'cashier';
+export type EmployeeStatus = 'active' | 'inactive';
+export type EmployeeShift = 'All' | 'Morning (08:00-15:00)' | 'Evening (15:00-22:00)';
+
+export interface DemoEmployee {
+  id: string;
+  name: string;
+  role: EmployeeRole;
+  status: EmployeeStatus;
+  email: string;
+  shift: EmployeeShift;
+  createdAt: number;
+}
+
+export interface DemoSettings {
+  language: 'English' | 'Indonesian';
+  hotWalletAddress: string;
+  coldWalletAddress: string;
+  autoSweepThresholdBch: number;
+  autoSweepEnabled: boolean;
+  priceOracle: 'CoinGecko API (Free)' | 'Binance API' | 'Custom Oracle';
+  fiatCurrency: 'USD - US Dollar' | 'EUR - Euro';
+  slippageTolerancePct: number;
+  priceRefreshIntervalSec: 15 | 30 | 60;
+  tokenName: string;
+  rewardRate: number;
+  autoMintLoyaltyToken: boolean;
+  digitalReceiptNft: boolean;
+  notificationIncomingPayments: boolean;
+  notificationFailedTransactions: boolean;
+  notificationSweepReminder: boolean;
+  notificationNewCustomers: boolean;
+  cashierPin: string;
+  twoFactorEnabled: boolean;
+}
+
+export type DemoActionResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 interface DemoDataContextValue {
   products: DemoProduct[];
   bchUsdRate: number;
@@ -102,6 +142,8 @@ interface DemoDataContextValue {
   treasurySnapshot: TreasurySnapshot;
   treasurySweeps: TreasurySweepEvent[];
   pendingMintTransactions: DemoTransaction[];
+  employees: DemoEmployee[];
+  settings: DemoSettings;
   createProduct: (input: Omit<DemoProduct, 'id' | 'priceBch'>) => void;
   updateProduct: (productId: string, patch: Partial<Omit<DemoProduct, 'id'>>) => void;
   deleteProduct: (productId: string) => void;
@@ -119,6 +161,12 @@ interface DemoDataContextValue {
   sweepToColdWallet: (amountBch?: number) => boolean;
   burnTreasurySupply: (amount: number) => boolean;
   mintPendingTransaction: (txId: string) => boolean;
+  createEmployee: (input: Omit<DemoEmployee, 'id' | 'createdAt'>) => DemoActionResult;
+  updateEmployee: (employeeId: string, patch: Partial<Omit<DemoEmployee, 'id' | 'createdAt'>>) => DemoActionResult;
+  deleteEmployee: (employeeId: string) => DemoActionResult;
+  toggleEmployeeStatus: (employeeId: string) => DemoActionResult;
+  updateSettings: (patch: Partial<DemoSettings>) => DemoActionResult;
+  resetSettings: () => void;
 }
 
 const demoProducts: DemoProduct[] = [
@@ -132,7 +180,8 @@ const demoProducts: DemoProduct[] = [
   { id: '8', name: 'Cheesecake Slice', sku: 'FOD-005', price: 1.86, priceBch: 0.0062, stock: 15, category: 'Food', image: 'CK' },
 ];
 
-const merchantAddress = 'bitcoincash:qph7w9merchant8qv8xdem0m28jk4alhjk2jv7r3';
+const DEFAULT_HOT_WALLET_ADDRESS = 'bitcoincash:qph7w9merchant8qv8xdem0m28jk4alhjk2jv7r3';
+const DEFAULT_COLD_WALLET_ADDRESS = 'bitcoincash:qp4r2nm8k6w1h9x2q4v9c8m2f7a6r3s1t0';
 const UNLIMITED_STOCK = 999;
 const CHECKOUT_EXPIRY_MS = 5 * 60 * 1000;
 const BROADCAST_DELAY_MS = 1200;
@@ -146,6 +195,67 @@ const TREASURY_INITIAL_COLD_WALLET_BCH = 2.4;
 const TREASURY_DEFAULT_SWEEP_THRESHOLD_BCH = 1;
 const TREASURY_MIN_HOT_RESERVE_BCH = 0.2;
 const TREASURY_MAX_SWEEP_THRESHOLD_BCH = 25;
+
+const defaultEmployees: DemoEmployee[] = [
+  {
+    id: 'EMP-001',
+    name: 'Ahmad Rizky',
+    role: 'owner',
+    status: 'active',
+    email: 'ahmad@ncash.io',
+    shift: 'All',
+    createdAt: Date.now() - (30 * 24 * 60 * 60 * 1000),
+  },
+  {
+    id: 'EMP-002',
+    name: 'Siti Nurhaliza',
+    role: 'cashier',
+    status: 'active',
+    email: 'siti@ncash.io',
+    shift: 'Morning (08:00-15:00)',
+    createdAt: Date.now() - (25 * 24 * 60 * 60 * 1000),
+  },
+  {
+    id: 'EMP-003',
+    name: 'Budi Santoso',
+    role: 'cashier',
+    status: 'active',
+    email: 'budi@ncash.io',
+    shift: 'Evening (15:00-22:00)',
+    createdAt: Date.now() - (18 * 24 * 60 * 60 * 1000),
+  },
+  {
+    id: 'EMP-004',
+    name: 'Dewi Lestari',
+    role: 'cashier',
+    status: 'inactive',
+    email: 'dewi@ncash.io',
+    shift: 'Morning (08:00-15:00)',
+    createdAt: Date.now() - (11 * 24 * 60 * 60 * 1000),
+  },
+];
+
+const defaultSettings: DemoSettings = {
+  language: 'English',
+  hotWalletAddress: DEFAULT_HOT_WALLET_ADDRESS,
+  coldWalletAddress: DEFAULT_COLD_WALLET_ADDRESS,
+  autoSweepThresholdBch: TREASURY_DEFAULT_SWEEP_THRESHOLD_BCH,
+  autoSweepEnabled: false,
+  priceOracle: 'CoinGecko API (Free)',
+  fiatCurrency: 'USD - US Dollar',
+  slippageTolerancePct: 0.5,
+  priceRefreshIntervalSec: 30,
+  tokenName: '$NEXUS',
+  rewardRate: 8,
+  autoMintLoyaltyToken: true,
+  digitalReceiptNft: true,
+  notificationIncomingPayments: true,
+  notificationFailedTransactions: true,
+  notificationSweepReminder: true,
+  notificationNewCustomers: false,
+  cashierPin: '1234',
+  twoFactorEnabled: false,
+};
 
 const DemoDataContext = createContext<DemoDataContextValue | undefined>(undefined);
 
@@ -275,6 +385,35 @@ function nextSweepId(): string {
   return `SWP-${Date.now()}-${suffix}`;
 }
 
+function nextEmployeeId(employees: DemoEmployee[]): string {
+  const highest = employees.reduce((max, employee) => {
+    const parsed = Number(employee.id.replace('EMP-', ''));
+    return Number.isFinite(parsed) ? Math.max(max, parsed) : max;
+  }, 0);
+  return `EMP-${String(highest + 1).padStart(3, '0')}`;
+}
+
+function normalizeWallet(address: string, fallback: string): string {
+  const trimmed = address.trim();
+  if (!trimmed) return fallback;
+  return trimmed;
+}
+
+function normalizeRewardRate(value: number): number {
+  if (!Number.isFinite(value)) return defaultSettings.rewardRate;
+  return roundTo(Math.min(50, Math.max(1, value)), 2);
+}
+
+function normalizeSlippage(value: number): number {
+  if (!Number.isFinite(value)) return defaultSettings.slippageTolerancePct;
+  return roundTo(Math.min(10, Math.max(0, value)), 2);
+}
+
+function normalizeCashierPin(pin: string): string {
+  const digits = pin.replace(/\D/g, '').slice(0, 4);
+  return digits.padEnd(4, '0');
+}
+
 export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [bchUsdRate, setBchUsdRate] = useState<number>(BCH_TO_USD);
   const [lastRateSyncAt, setLastRateSyncAt] = useState<Date | null>(new Date());
@@ -283,12 +422,14 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerWallet, setCustomerWallet] = useState('bitcoincash:qrx9...newbuyer');
   const [activeCheckout, setActiveCheckout] = useState<CheckoutSession | null>(null);
+  const [employees, setEmployees] = useState<DemoEmployee[]>(() => defaultEmployees);
+  const [settings, setSettings] = useState<DemoSettings>(() => defaultSettings);
   const [additionalBurnedTokens, setAdditionalBurnedTokens] = useState(0);
   const [hotWalletBch, setHotWalletBch] = useState(TREASURY_INITIAL_HOT_WALLET_BCH);
   const [coldWalletBch, setColdWalletBch] = useState(TREASURY_INITIAL_COLD_WALLET_BCH);
-  const [sweepThresholdBch, setSweepThresholdBchState] = useState(TREASURY_DEFAULT_SWEEP_THRESHOLD_BCH);
-  const [autoMintEnabled, setAutoMintEnabled] = useState(true);
-  const [autoSweepEnabled, setAutoSweepEnabled] = useState(false);
+  const [sweepThresholdBch, setSweepThresholdBchState] = useState(defaultSettings.autoSweepThresholdBch);
+  const [autoMintEnabled, setAutoMintEnabled] = useState(defaultSettings.autoMintLoyaltyToken);
+  const [autoSweepEnabled, setAutoSweepEnabled] = useState(defaultSettings.autoSweepEnabled);
   const [treasurySweeps, setTreasurySweeps] = useState<TreasurySweepEvent[]>([]);
   const broadcastingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confirmationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -454,11 +595,15 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   const clearCart = () => setCart([]);
 
   const setTreasuryAutoMintEnabled = (enabled: boolean) => {
-    setAutoMintEnabled(Boolean(enabled));
+    const nextValue = Boolean(enabled);
+    setAutoMintEnabled(nextValue);
+    setSettings(prev => ({ ...prev, autoMintLoyaltyToken: nextValue }));
   };
 
   const setTreasuryAutoSweepEnabled = (enabled: boolean) => {
-    setAutoSweepEnabled(Boolean(enabled));
+    const nextValue = Boolean(enabled);
+    setAutoSweepEnabled(nextValue);
+    setSettings(prev => ({ ...prev, autoSweepEnabled: nextValue }));
   };
 
   const setTreasurySweepThreshold = (threshold: number) => {
@@ -468,6 +613,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       3,
     );
     setSweepThresholdBchState(normalized);
+    setSettings(prev => ({ ...prev, autoSweepThresholdBch: normalized }));
   };
 
   const recordSweep = (
@@ -519,7 +665,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     if (target.status !== 'confirmed') return false;
     if (target.tokensGiven > 0) return false;
 
-    const requestedReward = Math.max(5, Math.round(target.fiat * 8));
+    const requestedReward = Math.max(5, Math.round(target.fiat * settings.rewardRate));
     const mintable = Math.min(requestedReward, treasurySnapshot.availableSupply);
     if (mintable <= 0) return false;
 
@@ -528,9 +674,11 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       if (tx.status !== 'confirmed' || tx.tokensGiven > 0) return tx;
       return {
         ...tx,
-        nftMinted: true,
+        nftMinted: settings.digitalReceiptNft,
         tokensGiven: mintable,
-        receiptNftId: tx.receiptNftId ?? `NFT-RCP-${tx.id.replace('TX-', '')}`,
+        receiptNftId: settings.digitalReceiptNft
+          ? tx.receiptNftId ?? `NFT-RCP-${tx.id.replace('TX-', '')}`
+          : undefined,
       };
     }));
 
@@ -544,6 +692,190 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     });
 
     return true;
+  };
+
+  const createEmployee = (input: Omit<DemoEmployee, 'id' | 'createdAt'>): DemoActionResult => {
+    const name = input.name.trim();
+    const email = input.email.trim().toLowerCase();
+    const role: EmployeeRole = input.role === 'owner' ? 'owner' : 'cashier';
+    const status: EmployeeStatus = input.status === 'inactive' ? 'inactive' : 'active';
+    const shift: EmployeeShift =
+      input.shift === 'Morning (08:00-15:00)' || input.shift === 'Evening (15:00-22:00)' || input.shift === 'All'
+        ? input.shift
+        : 'Morning (08:00-15:00)';
+
+    if (name.length < 3) {
+      return { ok: false, error: 'Nama karyawan minimal 3 karakter.' };
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { ok: false, error: 'Email karyawan tidak valid.' };
+    }
+    if (employees.some(employee => employee.email.toLowerCase() === email)) {
+      return { ok: false, error: 'Email sudah terdaftar.' };
+    }
+
+    const nextEmployee: DemoEmployee = {
+      id: nextEmployeeId(employees),
+      name,
+      email,
+      role,
+      status,
+      shift,
+      createdAt: Date.now(),
+    };
+    setEmployees(prev => [nextEmployee, ...prev]);
+    return { ok: true };
+  };
+
+  const updateEmployee = (
+    employeeId: string,
+    patch: Partial<Omit<DemoEmployee, 'id' | 'createdAt'>>,
+  ): DemoActionResult => {
+    const target = employees.find(employee => employee.id === employeeId);
+    if (!target) {
+      return { ok: false, error: 'Karyawan tidak ditemukan.' };
+    }
+
+    const nextName = patch.name == null ? target.name : patch.name.trim();
+    const nextEmail = patch.email == null ? target.email : patch.email.trim().toLowerCase();
+    const nextRole: EmployeeRole =
+      patch.role == null ? target.role : patch.role === 'owner' ? 'owner' : 'cashier';
+    const nextStatus: EmployeeStatus =
+      patch.status == null ? target.status : patch.status === 'inactive' ? 'inactive' : 'active';
+    const nextShift: EmployeeShift =
+      patch.shift == null
+        ? target.shift
+        : patch.shift === 'Morning (08:00-15:00)' || patch.shift === 'Evening (15:00-22:00)' || patch.shift === 'All'
+          ? patch.shift
+          : target.shift;
+
+    if (nextName.length < 3) {
+      return { ok: false, error: 'Nama karyawan minimal 3 karakter.' };
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      return { ok: false, error: 'Email karyawan tidak valid.' };
+    }
+    if (employees.some(employee => employee.id !== employeeId && employee.email.toLowerCase() === nextEmail)) {
+      return { ok: false, error: 'Email sudah digunakan karyawan lain.' };
+    }
+
+    const activeOwners = employees.filter(employee =>
+      employee.id === employeeId
+        ? nextRole === 'owner' && nextStatus === 'active'
+        : employee.role === 'owner' && employee.status === 'active',
+    );
+    if (activeOwners.length === 0) {
+      return { ok: false, error: 'Minimal harus ada 1 owner aktif.' };
+    }
+
+    setEmployees(prev => prev.map(employee => {
+      if (employee.id !== employeeId) return employee;
+      return {
+        ...employee,
+        name: nextName,
+        email: nextEmail,
+        role: nextRole,
+        status: nextStatus,
+        shift: nextShift,
+      };
+    }));
+
+    return { ok: true };
+  };
+
+  const deleteEmployee = (employeeId: string): DemoActionResult => {
+    const target = employees.find(employee => employee.id === employeeId);
+    if (!target) {
+      return { ok: false, error: 'Karyawan tidak ditemukan.' };
+    }
+
+    const remainingOwners = employees.filter(employee =>
+      employee.id !== employeeId && employee.role === 'owner',
+    );
+    if (target.role === 'owner' && remainingOwners.length === 0) {
+      return { ok: false, error: 'Owner terakhir tidak bisa dihapus.' };
+    }
+
+    setEmployees(prev => prev.filter(employee => employee.id !== employeeId));
+    return { ok: true };
+  };
+
+  const toggleEmployeeStatus = (employeeId: string): DemoActionResult => {
+    const target = employees.find(employee => employee.id === employeeId);
+    if (!target) {
+      return { ok: false, error: 'Karyawan tidak ditemukan.' };
+    }
+    const nextStatus: EmployeeStatus = target.status === 'active' ? 'inactive' : 'active';
+    const activeOwners = employees.filter(employee =>
+      employee.id === employeeId
+        ? employee.role === 'owner' && nextStatus === 'active'
+        : employee.role === 'owner' && employee.status === 'active',
+    );
+    if (activeOwners.length === 0) {
+      return { ok: false, error: 'Minimal harus ada 1 owner aktif.' };
+    }
+
+    setEmployees(prev => prev.map(employee => {
+      if (employee.id !== employeeId) return employee;
+      return {
+        ...employee,
+        status: nextStatus,
+      };
+    }));
+    return { ok: true };
+  };
+
+  const updateSettings = (patch: Partial<DemoSettings>): DemoActionResult => {
+    const nextSettings: DemoSettings = {
+      ...settings,
+      ...patch,
+    };
+
+    nextSettings.language = nextSettings.language === 'Indonesian' ? 'Indonesian' : 'English';
+    nextSettings.hotWalletAddress = normalizeWallet(nextSettings.hotWalletAddress, DEFAULT_HOT_WALLET_ADDRESS);
+    nextSettings.coldWalletAddress = normalizeWallet(nextSettings.coldWalletAddress, DEFAULT_COLD_WALLET_ADDRESS);
+    nextSettings.autoSweepThresholdBch = roundTo(
+      Math.min(TREASURY_MAX_SWEEP_THRESHOLD_BCH, Math.max(TREASURY_MIN_HOT_RESERVE_BCH, nextSettings.autoSweepThresholdBch)),
+      3,
+    );
+    nextSettings.autoSweepEnabled = Boolean(nextSettings.autoSweepEnabled);
+    nextSettings.priceOracle =
+      nextSettings.priceOracle === 'Binance API' || nextSettings.priceOracle === 'Custom Oracle'
+        ? nextSettings.priceOracle
+        : 'CoinGecko API (Free)';
+    nextSettings.fiatCurrency =
+      nextSettings.fiatCurrency === 'EUR - Euro'
+        ? 'EUR - Euro'
+        : 'USD - US Dollar';
+    nextSettings.slippageTolerancePct = normalizeSlippage(nextSettings.slippageTolerancePct);
+    nextSettings.priceRefreshIntervalSec =
+      nextSettings.priceRefreshIntervalSec === 15 || nextSettings.priceRefreshIntervalSec === 60
+        ? nextSettings.priceRefreshIntervalSec
+        : 30;
+    nextSettings.tokenName = nextSettings.tokenName.trim() || defaultSettings.tokenName;
+    nextSettings.rewardRate = normalizeRewardRate(nextSettings.rewardRate);
+    nextSettings.autoMintLoyaltyToken = Boolean(nextSettings.autoMintLoyaltyToken);
+    nextSettings.digitalReceiptNft = Boolean(nextSettings.digitalReceiptNft);
+    nextSettings.notificationIncomingPayments = Boolean(nextSettings.notificationIncomingPayments);
+    nextSettings.notificationFailedTransactions = Boolean(nextSettings.notificationFailedTransactions);
+    nextSettings.notificationSweepReminder = Boolean(nextSettings.notificationSweepReminder);
+    nextSettings.notificationNewCustomers = Boolean(nextSettings.notificationNewCustomers);
+    nextSettings.cashierPin = normalizeCashierPin(nextSettings.cashierPin);
+    nextSettings.twoFactorEnabled = Boolean(nextSettings.twoFactorEnabled);
+
+    setSettings(nextSettings);
+    setAutoMintEnabled(nextSettings.autoMintLoyaltyToken);
+    setAutoSweepEnabled(nextSettings.autoSweepEnabled);
+    setSweepThresholdBchState(nextSettings.autoSweepThresholdBch);
+
+    return { ok: true };
+  };
+
+  const resetSettings = () => {
+    setSettings(defaultSettings);
+    setAutoMintEnabled(defaultSettings.autoMintLoyaltyToken);
+    setAutoSweepEnabled(defaultSettings.autoSweepEnabled);
+    setSweepThresholdBchState(defaultSettings.autoSweepThresholdBch);
   };
 
   const clearPaymentTimers = () => {
@@ -561,9 +893,11 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     const randomHeight = 831200 + Math.floor(Math.random() * 500);
     let transitionedToConfirmed = false;
     const mintableFromTreasury = Math.min(session.requestedTokenReward, treasurySnapshot.availableSupply);
-    const mintedReward = autoMintEnabled ? mintableFromTreasury : 0;
+    const shouldAutoMint = autoMintEnabled && settings.autoMintLoyaltyToken;
+    const mintedReward = shouldAutoMint ? mintableFromTreasury : 0;
+    const shouldMintReceipt = settings.digitalReceiptNft;
     const mintNote =
-      !autoMintEnabled
+      !shouldAutoMint
         ? 'Auto-mint OFF. Mint this reward from CashToken Treasury.'
         : mintedReward <= 0
           ? 'Treasury supply is depleted. Reward cannot be minted.'
@@ -576,10 +910,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       return {
         ...tx,
         status: 'confirmed',
-        nftMinted: mintedReward > 0,
+        nftMinted: shouldMintReceipt,
         tokensGiven: mintedReward,
         blockHeight: randomHeight,
-        receiptNftId: mintedReward > 0 ? session.receiptNftId : undefined,
+        receiptNftId: shouldMintReceipt ? session.receiptNftId : undefined,
       };
     }));
 
@@ -668,8 +1002,9 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
     const txId = getNextTransactionId(transactions);
     const { date, time } = getNowParts();
-    const paymentUri = `${merchantAddress}?amount=${cartTotalBch}`;
-    const tokenReward = Math.max(5, Math.round(cartTotalUsd * 8));
+    const paymentAddress = normalizeWallet(settings.hotWalletAddress, DEFAULT_HOT_WALLET_ADDRESS);
+    const paymentUri = `${paymentAddress}?amount=${cartTotalBch}`;
+    const tokenReward = Math.max(5, Math.round(cartTotalUsd * settings.rewardRate));
     const receiptNftId = `NFT-RCP-${txId.replace('TX-', '')}`;
 
     const pendingTx: DemoTransaction = {
@@ -693,7 +1028,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       customer: pendingTx.customer,
       amountUsd: cartTotalUsd,
       amountBch: cartTotalBch,
-      paymentAddress: merchantAddress,
+      paymentAddress,
       paymentUri,
       status: 'awaiting_payment',
       requestedTokenReward: tokenReward,
@@ -806,6 +1141,8 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         treasurySnapshot,
         treasurySweeps,
         pendingMintTransactions,
+        employees,
+        settings,
         createProduct,
         updateProduct,
         deleteProduct,
@@ -823,6 +1160,12 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         sweepToColdWallet,
         burnTreasurySupply,
         mintPendingTransaction,
+        createEmployee,
+        updateEmployee,
+        deleteEmployee,
+        toggleEmployeeStatus,
+        updateSettings,
+        resetSettings,
       }}
     >
       {children}

@@ -11,7 +11,14 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      const stored = localStorage.getItem('ncash-theme');
+      return stored === 'dark' || stored === 'light' ? stored : 'light';
+    } catch {
+      return 'light';
+    }
+  });
 
   const isDark = theme === 'dark';
 
