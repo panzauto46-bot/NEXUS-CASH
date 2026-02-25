@@ -43,6 +43,7 @@ export interface CheckoutSession {
   paymentAddress: string;
   paymentUri: string;
   status: 'awaiting_payment' | 'broadcasting' | 'confirming' | 'confirmed' | 'failed' | 'expired';
+  requestedTokenReward: number;
   tokenReward: number;
   receiptNftId: string;
   orderLines: Array<{ productId: string; quantity: number }>;
@@ -52,6 +53,7 @@ export interface CheckoutSession {
   confirmedAt?: number;
   networkRef?: string;
   failureReason?: string;
+  mintNote?: string;
 }
 
 interface DashboardMetrics {
@@ -59,6 +61,30 @@ interface DashboardMetrics {
   totalTransactions: number;
   mintedTokens: number;
   activeCustomers: number;
+}
+
+export type SweepTrigger = 'manual' | 'auto';
+
+export interface TreasurySnapshot {
+  totalSupply: number;
+  distributedSupply: number;
+  burnedSupply: number;
+  availableSupply: number;
+  hotWalletBch: number;
+  coldWalletBch: number;
+  sweepThresholdBch: number;
+  autoMintEnabled: boolean;
+  autoSweepEnabled: boolean;
+  projectedSweepAmountBch: number;
+}
+
+export interface TreasurySweepEvent {
+  id: string;
+  trigger: SweepTrigger;
+  amountBch: number;
+  createdAt: number;
+  hotWalletAfterBch: number;
+  coldWalletAfterBch: number;
 }
 
 interface DemoDataContextValue {
@@ -73,6 +99,9 @@ interface DemoDataContextValue {
   customerWallet: string;
   activeCheckout: CheckoutSession | null;
   dashboardMetrics: DashboardMetrics;
+  treasurySnapshot: TreasurySnapshot;
+  treasurySweeps: TreasurySweepEvent[];
+  pendingMintTransactions: DemoTransaction[];
   createProduct: (input: Omit<DemoProduct, 'id' | 'priceBch'>) => void;
   updateProduct: (productId: string, patch: Partial<Omit<DemoProduct, 'id'>>) => void;
   deleteProduct: (productId: string) => void;
@@ -84,6 +113,12 @@ interface DemoDataContextValue {
   startCheckout: () => void;
   submitDemoPayment: () => void;
   clearCheckoutSession: () => void;
+  setTreasuryAutoMintEnabled: (enabled: boolean) => void;
+  setTreasuryAutoSweepEnabled: (enabled: boolean) => void;
+  setTreasurySweepThreshold: (threshold: number) => void;
+  sweepToColdWallet: (amountBch?: number) => boolean;
+  burnTreasurySupply: (amount: number) => boolean;
+  mintPendingTransaction: (txId: string) => boolean;
 }
 
 const demoProducts: DemoProduct[] = [
@@ -103,6 +138,14 @@ const CHECKOUT_EXPIRY_MS = 5 * 60 * 1000;
 const BROADCAST_DELAY_MS = 1200;
 const CONFIRMATION_BASE_DELAY_MS = 3200;
 const CONFIRMATION_RANDOM_DELAY_MS = 2200;
+const TREASURY_TOTAL_SUPPLY = 100_000;
+const TREASURY_BASE_BURNED = 20_000;
+const TREASURY_BASE_DISTRIBUTED = 44_717;
+const TREASURY_INITIAL_HOT_WALLET_BCH = 0.842;
+const TREASURY_INITIAL_COLD_WALLET_BCH = 2.4;
+const TREASURY_DEFAULT_SWEEP_THRESHOLD_BCH = 1;
+const TREASURY_MIN_HOT_RESERVE_BCH = 0.2;
+const TREASURY_MAX_SWEEP_THRESHOLD_BCH = 25;
 
 const DemoDataContext = createContext<DemoDataContextValue | undefined>(undefined);
 
@@ -222,6 +265,16 @@ function randomNetworkRef(txId: string): string {
   return `mempool-${txId.toLowerCase()}-${suffix}`;
 }
 
+function txTimestamp(tx: DemoTransaction): number {
+  const parsed = Date.parse(`${tx.date}T${tx.time}:00`);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function nextSweepId(): string {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `SWP-${Date.now()}-${suffix}`;
+}
+
 export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [bchUsdRate, setBchUsdRate] = useState<number>(BCH_TO_USD);
   const [lastRateSyncAt, setLastRateSyncAt] = useState<Date | null>(new Date());
@@ -230,6 +283,13 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerWallet, setCustomerWallet] = useState('bitcoincash:qrx9...newbuyer');
   const [activeCheckout, setActiveCheckout] = useState<CheckoutSession | null>(null);
+  const [additionalBurnedTokens, setAdditionalBurnedTokens] = useState(0);
+  const [hotWalletBch, setHotWalletBch] = useState(TREASURY_INITIAL_HOT_WALLET_BCH);
+  const [coldWalletBch, setColdWalletBch] = useState(TREASURY_INITIAL_COLD_WALLET_BCH);
+  const [sweepThresholdBch, setSweepThresholdBchState] = useState(TREASURY_DEFAULT_SWEEP_THRESHOLD_BCH);
+  const [autoMintEnabled, setAutoMintEnabled] = useState(true);
+  const [autoSweepEnabled, setAutoSweepEnabled] = useState(false);
+  const [treasurySweeps, setTreasurySweeps] = useState<TreasurySweepEvent[]>([]);
   const broadcastingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confirmationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -258,6 +318,47 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     const mintedTokens = transactions.reduce((sum, tx) => sum + tx.tokensGiven, 0);
     const activeCustomers = new Set(transactions.map(tx => tx.customer)).size;
     return { totalBch, totalTransactions, mintedTokens, activeCustomers };
+  }, [transactions]);
+
+  const treasurySnapshot = useMemo<TreasurySnapshot>(() => {
+    const mintedFromTransactions = transactions.reduce((sum, tx) => sum + tx.tokensGiven, 0);
+    const rawDistributed = TREASURY_BASE_DISTRIBUTED + mintedFromTransactions;
+    const distributedSupply = Math.min(TREASURY_TOTAL_SUPPLY, Math.max(0, rawDistributed));
+    const rawBurned = TREASURY_BASE_BURNED + additionalBurnedTokens;
+    const burnedSupply = Math.min(TREASURY_TOTAL_SUPPLY - distributedSupply, Math.max(0, rawBurned));
+    const availableSupply = Math.max(TREASURY_TOTAL_SUPPLY - distributedSupply - burnedSupply, 0);
+    const sweepableNow = Math.max(hotWalletBch - TREASURY_MIN_HOT_RESERVE_BCH, 0);
+    const projectedSweepAmountBch =
+      autoSweepEnabled && hotWalletBch >= sweepThresholdBch
+        ? roundTo(sweepableNow, 4)
+        : 0;
+
+    return {
+      totalSupply: TREASURY_TOTAL_SUPPLY,
+      distributedSupply,
+      burnedSupply,
+      availableSupply,
+      hotWalletBch,
+      coldWalletBch,
+      sweepThresholdBch,
+      autoMintEnabled,
+      autoSweepEnabled,
+      projectedSweepAmountBch,
+    };
+  }, [
+    transactions,
+    additionalBurnedTokens,
+    hotWalletBch,
+    coldWalletBch,
+    sweepThresholdBch,
+    autoMintEnabled,
+    autoSweepEnabled,
+  ]);
+
+  const pendingMintTransactions = useMemo(() => {
+    return [...transactions]
+      .filter(tx => tx.status === 'confirmed' && tx.tokensGiven === 0)
+      .sort((left, right) => txTimestamp(right) - txTimestamp(left));
   }, [transactions]);
 
   const createProduct = (input: Omit<DemoProduct, 'id' | 'priceBch'>) => {
@@ -352,6 +453,99 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => setCart([]);
 
+  const setTreasuryAutoMintEnabled = (enabled: boolean) => {
+    setAutoMintEnabled(Boolean(enabled));
+  };
+
+  const setTreasuryAutoSweepEnabled = (enabled: boolean) => {
+    setAutoSweepEnabled(Boolean(enabled));
+  };
+
+  const setTreasurySweepThreshold = (threshold: number) => {
+    if (!Number.isFinite(threshold)) return;
+    const normalized = roundTo(
+      Math.min(TREASURY_MAX_SWEEP_THRESHOLD_BCH, Math.max(TREASURY_MIN_HOT_RESERVE_BCH, threshold)),
+      3,
+    );
+    setSweepThresholdBchState(normalized);
+  };
+
+  const recordSweep = (
+    amountBch: number,
+    trigger: SweepTrigger,
+    hotWalletAfterBch: number,
+    coldWalletAfterBch: number,
+  ) => {
+    const event: TreasurySweepEvent = {
+      id: nextSweepId(),
+      trigger,
+      amountBch: roundTo(amountBch, 4),
+      createdAt: Date.now(),
+      hotWalletAfterBch: roundTo(hotWalletAfterBch, 4),
+      coldWalletAfterBch: roundTo(coldWalletAfterBch, 4),
+    };
+    setTreasurySweeps(prev => [event, ...prev].slice(0, 30));
+  };
+
+  const executeSweep = (trigger: SweepTrigger, amountBch?: number): boolean => {
+    const sweepable = roundTo(Math.max(hotWalletBch - TREASURY_MIN_HOT_RESERVE_BCH, 0), 4);
+    if (sweepable <= 0) return false;
+
+    const requested = amountBch == null ? sweepable : roundTo(Math.max(0, amountBch), 4);
+    const finalAmount = Math.min(requested, sweepable);
+    if (finalAmount <= 0) return false;
+
+    const nextHotWallet = roundTo(hotWalletBch - finalAmount, 4);
+    const nextColdWallet = roundTo(coldWalletBch + finalAmount, 4);
+    setHotWalletBch(nextHotWallet);
+    setColdWalletBch(nextColdWallet);
+    recordSweep(finalAmount, trigger, nextHotWallet, nextColdWallet);
+    return true;
+  };
+
+  const sweepToColdWallet = (amountBch?: number) => executeSweep('manual', amountBch);
+
+  const burnTreasurySupply = (amount: number): boolean => {
+    const burnAmount = Math.max(0, Math.floor(amount));
+    if (burnAmount <= 0) return false;
+    if (burnAmount > treasurySnapshot.availableSupply) return false;
+    setAdditionalBurnedTokens(prev => prev + burnAmount);
+    return true;
+  };
+
+  const mintPendingTransaction = (txId: string): boolean => {
+    const target = transactions.find(tx => tx.id === txId);
+    if (!target) return false;
+    if (target.status !== 'confirmed') return false;
+    if (target.tokensGiven > 0) return false;
+
+    const requestedReward = Math.max(5, Math.round(target.fiat * 8));
+    const mintable = Math.min(requestedReward, treasurySnapshot.availableSupply);
+    if (mintable <= 0) return false;
+
+    setTransactions(prev => prev.map(tx => {
+      if (tx.id !== txId) return tx;
+      if (tx.status !== 'confirmed' || tx.tokensGiven > 0) return tx;
+      return {
+        ...tx,
+        nftMinted: true,
+        tokensGiven: mintable,
+        receiptNftId: tx.receiptNftId ?? `NFT-RCP-${tx.id.replace('TX-', '')}`,
+      };
+    }));
+
+    setActiveCheckout(prev => {
+      if (!prev || prev.txId !== txId) return prev;
+      return {
+        ...prev,
+        tokenReward: mintable,
+        mintNote: undefined,
+      };
+    });
+
+    return true;
+  };
+
   const clearPaymentTimers = () => {
     if (broadcastingTimerRef.current) {
       clearTimeout(broadcastingTimerRef.current);
@@ -366,6 +560,14 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   const settleCheckoutAsConfirmed = (session: CheckoutSession) => {
     const randomHeight = 831200 + Math.floor(Math.random() * 500);
     let transitionedToConfirmed = false;
+    const mintableFromTreasury = Math.min(session.requestedTokenReward, treasurySnapshot.availableSupply);
+    const mintedReward = autoMintEnabled ? mintableFromTreasury : 0;
+    const mintNote =
+      !autoMintEnabled
+        ? 'Auto-mint OFF. Mint this reward from CashToken Treasury.'
+        : mintedReward <= 0
+          ? 'Treasury supply is depleted. Reward cannot be minted.'
+          : undefined;
 
     setTransactions(prev => prev.map(tx => {
       if (tx.id !== session.txId) return tx;
@@ -374,21 +576,42 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       return {
         ...tx,
         status: 'confirmed',
-        nftMinted: true,
-        tokensGiven: session.tokenReward,
+        nftMinted: mintedReward > 0,
+        tokensGiven: mintedReward,
         blockHeight: randomHeight,
-        receiptNftId: session.receiptNftId,
+        receiptNftId: mintedReward > 0 ? session.receiptNftId : undefined,
       };
     }));
 
-    if (transitionedToConfirmed && session.orderLines.length > 0) {
-      setProducts(prevProducts => prevProducts.map(product => {
-        const orderedLine = session.orderLines.find(line => line.productId === product.id);
-        if (!orderedLine) return product;
-        if (product.stock === UNLIMITED_STOCK) return product;
-        const nextStock = Math.max(0, product.stock - orderedLine.quantity);
-        return { ...product, stock: nextStock };
-      }));
+    if (transitionedToConfirmed) {
+      if (session.orderLines.length > 0) {
+        setProducts(prevProducts => prevProducts.map(product => {
+          const orderedLine = session.orderLines.find(line => line.productId === product.id);
+          if (!orderedLine) return product;
+          if (product.stock === UNLIMITED_STOCK) return product;
+          const nextStock = Math.max(0, product.stock - orderedLine.quantity);
+          return { ...product, stock: nextStock };
+        }));
+      }
+
+      const incomingHotWallet = roundTo(hotWalletBch + session.amountBch, 4);
+      let nextHotWallet = incomingHotWallet;
+      let sweptAmount = 0;
+
+      if (autoSweepEnabled && incomingHotWallet >= sweepThresholdBch) {
+        sweptAmount = roundTo(Math.max(incomingHotWallet - TREASURY_MIN_HOT_RESERVE_BCH, 0), 4);
+        if (sweptAmount > 0) {
+          nextHotWallet = roundTo(incomingHotWallet - sweptAmount, 4);
+        }
+      }
+
+      setHotWalletBch(nextHotWallet);
+
+      if (sweptAmount > 0) {
+        const nextColdWallet = roundTo(coldWalletBch + sweptAmount, 4);
+        setColdWalletBch(nextColdWallet);
+        recordSweep(sweptAmount, 'auto', nextHotWallet, nextColdWallet);
+      }
     }
 
     setActiveCheckout(prev => {
@@ -397,8 +620,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       return {
         ...prev,
         status: 'confirmed',
+        tokenReward: mintedReward,
         confirmedAt: Date.now(),
         failureReason: undefined,
+        mintNote,
       };
     });
 
@@ -429,6 +654,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         ...prev,
         status: nextStatus,
         failureReason: reason,
+        mintNote: undefined,
       };
     });
 
@@ -470,11 +696,13 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       paymentAddress: merchantAddress,
       paymentUri,
       status: 'awaiting_payment',
+      requestedTokenReward: tokenReward,
       tokenReward,
       receiptNftId,
       orderLines: cart.map(line => ({ productId: line.productId, quantity: line.quantity })),
       createdAt: Date.now(),
       expiresAt: Date.now() + CHECKOUT_EXPIRY_MS,
+      mintNote: undefined,
     });
     setCart([]);
   };
@@ -575,6 +803,9 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         customerWallet,
         activeCheckout,
         dashboardMetrics,
+        treasurySnapshot,
+        treasurySweeps,
+        pendingMintTransactions,
         createProduct,
         updateProduct,
         deleteProduct,
@@ -586,6 +817,12 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         startCheckout,
         submitDemoPayment,
         clearCheckoutSession,
+        setTreasuryAutoMintEnabled,
+        setTreasuryAutoSweepEnabled,
+        setTreasurySweepThreshold,
+        sweepToColdWallet,
+        burnTreasurySupply,
+        mintPendingTransaction,
       }}
     >
       {children}

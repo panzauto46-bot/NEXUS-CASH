@@ -283,6 +283,7 @@ export function Checkout({ onOpenProducts }: { onOpenProducts: () => void }) {
                 <p className={`text-xs ${textSub}`}>Wallet: <span className={textMain}>{activeCheckout.customer}</span></p>
                 <p className={`text-xs ${textSub}`}>Pay BCH: <span className="font-semibold text-nexus-green">{activeCheckout.amountBch} BCH</span></p>
                 <p className={`text-xs ${textSub}`}>Fiat: <span className={textMain}>{formatUsd(activeCheckout.amountUsd)}</span></p>
+                <p className={`text-xs ${textSub}`}>Reward Plan: <span className={textMain}>{activeCheckout.requestedTokenReward} pts</span></p>
                 <p className={`text-xs ${textSub}`}>Status: <span className={`font-semibold ${statusMeta.color}`}>{statusMeta.label}</span></p>
                 <p className={`text-xs ${textSub}`}>Expires In: <span className={paymentCountdown === 0 ? 'font-semibold text-nexus-red' : textMain}>{formatCountdown(paymentCountdown)}</span></p>
                 {activeCheckout.networkRef && (
@@ -335,8 +336,16 @@ export function Checkout({ onOpenProducts }: { onOpenProducts: () => void }) {
               {activeCheckout.status === 'confirmed' && (
                 <div className="mt-4 rounded-xl border border-nexus-green/25 bg-nexus-green/10 p-3">
                   <p className="text-xs font-bold text-nexus-green">Payment Confirmed</p>
-                  <p className={`mt-1 text-xs ${textSub}`}>CashToken Minted: +{activeCheckout.tokenReward} $NEXUS points</p>
-                  <p className={`text-xs ${textSub}`}>NFT Receipt: <span className={textMain}>{activeCheckout.receiptNftId}</span></p>
+                  {activeCheckout.tokenReward > 0 ? (
+                    <>
+                      <p className={`mt-1 text-xs ${textSub}`}>CashToken Minted: +{activeCheckout.tokenReward} $NEXUS points</p>
+                      <p className={`text-xs ${textSub}`}>NFT Receipt: <span className={textMain}>{activeCheckout.receiptNftId}</span></p>
+                    </>
+                  ) : (
+                    <p className={`mt-1 text-xs ${textSub}`}>
+                      {activeCheckout.mintNote ?? 'No reward minted on this confirmation.'}
+                    </p>
+                  )}
                 </div>
               )}
 
